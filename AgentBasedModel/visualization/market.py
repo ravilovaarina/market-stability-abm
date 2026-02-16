@@ -14,7 +14,7 @@ def plot_price(info: SimulatorInfo, spread=False, rolling: int = 1, figsize=(6, 
         v2 = [el['ask'] for el in info.spreads]
         plt.plot(range(rolling - 1, len(v1)), math.rolling(v1, rolling), label='bid', color='green')
         plt.plot(range(rolling - 1, len(v2)), math.rolling(v2, rolling), label='ask', color='red')
-    plt.show()
+
 
 
 def plot_price_fundamental(info: SimulatorInfo, spread=False, access: int = 1, rolling: int = 1, figsize=(6, 6)):
@@ -34,7 +34,7 @@ def plot_price_fundamental(info: SimulatorInfo, spread=False, access: int = 1, r
     plt.plot(range(rolling - 1, len(info.prices)), math.rolling(info.fundamental_value(access), rolling),
              label='fundamental value')
     plt.legend()
-    plt.show()
+
 
 
 def plot_arbitrage(info: SimulatorInfo, access: int = 1, rolling: int = 1, figsize=(6, 6)):
@@ -48,8 +48,8 @@ def plot_arbitrage(info: SimulatorInfo, access: int = 1, rolling: int = 1, figsi
     market = info.prices
     fundamental = info.fundamental_value(access)
     arbitrage = [(fundamental[i] - market[i]) / fundamental[i] for i in range(len(market))]
-    plt.plot(range(rolling, len(arbitrage)), math.rolling(arbitrage, rolling), color='black')
-    plt.show()
+    plt.plot(range(rolling - 1, len(arbitrage)), math.rolling(arbitrage, rolling), color='black')
+
 
 
 def plot_dividend(info: SimulatorInfo, rolling: int = 1, figsize=(6, 6)):
@@ -57,8 +57,8 @@ def plot_dividend(info: SimulatorInfo, rolling: int = 1, figsize=(6, 6)):
     plt.title('Stock Dividend') if rolling == 1 else plt.title(f'Stock Dividend (MA {rolling})')
     plt.xlabel('Iterations')
     plt.ylabel('Dividend')
-    plt.plot(range(rolling, len(info.dividends)), math.rolling(info.dividends, rolling), color='black')
-    plt.show()
+    plt.plot(range(rolling - 1, len(info.dividends)), math.rolling(info.dividends, rolling), color='black')
+
 
 
 def plot_orders(info: SimulatorInfo, stat: str = 'quantity', rolling: int = 1, figsize=(6, 6)):
@@ -68,10 +68,10 @@ def plot_orders(info: SimulatorInfo, stat: str = 'quantity', rolling: int = 1, f
     plt.ylabel(stat)
     v1 = [v[stat]['bid'] for v in info.orders]
     v2 = [v[stat]['ask'] for v in info.orders]
-    plt.plot(range(rolling, len(v1)), math.rolling(v1, rolling), label='bid', color='green')
-    plt.plot(range(rolling, len(v2)), math.rolling(v2, rolling), label='ask', color='red')
+    plt.plot(range(rolling - 1, len(v1)), math.rolling(v1, rolling), label='bid', color='green')
+    plt.plot(range(rolling - 1, len(v2)), math.rolling(v2, rolling), label='ask', color='red')
     plt.legend()
-    plt.show()
+
 
 
 def plot_volatility_price(info: SimulatorInfo, window: int = 5, figsize=(6, 6)):
@@ -81,7 +81,7 @@ def plot_volatility_price(info: SimulatorInfo, window: int = 5, figsize=(6, 6)):
     plt.ylabel('Price Volatility')
     volatility = info.price_volatility(window)
     plt.plot(range(window, len(volatility) + window), volatility, color='black')
-    plt.show()
+
 
 
 def plot_volatility_return(info: SimulatorInfo, window: int = 5, figsize=(6, 6)):
@@ -91,7 +91,7 @@ def plot_volatility_return(info: SimulatorInfo, window: int = 5, figsize=(6, 6))
     plt.ylabel('Return Volatility')
     volatility = info.return_volatility(window)
     plt.plot(range(window, len(volatility) + window), volatility, color='black')
-    plt.show()
+
 
 
 def plot_liquidity(info: SimulatorInfo, rolling: int = 1, figsize=(6, 6)):
@@ -100,4 +100,4 @@ def plot_liquidity(info: SimulatorInfo, rolling: int = 1, figsize=(6, 6)):
     plt.xlabel('Iterations')
     plt.ylabel('Spread / avg. Price')
     plt.plot(info.liquidity(rolling), color='black')
-    plt.show()
+

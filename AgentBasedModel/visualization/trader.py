@@ -13,10 +13,9 @@ def plot_equity(info: SimulatorInfo, rolling: int = 1, figsize=(6, 6)):
     data = math.aggregate(info.types, info.equities, labels)
     for k, v in data.items():
         if sum([_ is not None for _ in v]):
-            plt.plot(range(rolling, len(v)), math.rolling(v, rolling), label=k)
+            plt.plot(range(rolling - 1, len(v)), math.rolling(v, rolling), label=k)
 
     plt.legend()
-    plt.show()
 
 
 def plot_cash(info: SimulatorInfo, rolling: int = 1, figsize=(6, 6)):
@@ -29,10 +28,10 @@ def plot_cash(info: SimulatorInfo, rolling: int = 1, figsize=(6, 6)):
     data = math.aggregate(info.types, info.cash, labels)
     for k, v in data.items():
         if sum([_ is not None for _ in v]):
-            plt.plot(range(rolling, len(v)), math.rolling(v, rolling), label=k)
+            plt.plot(range(rolling - 1, len(v)), math.rolling(v, rolling), label=k)
 
     plt.legend()
-    plt.show()
+
 
 
 def plot_assets(info: SimulatorInfo, rolling: int = 1, figsize=(6, 6)):
@@ -45,10 +44,10 @@ def plot_assets(info: SimulatorInfo, rolling: int = 1, figsize=(6, 6)):
     data = math.aggregate(info.types, info.assets, labels)
     for k, v in data.items():
         if sum([_ is not None for _ in v]):
-            plt.plot(range(rolling, len(v)), math.rolling(v, rolling), label=k)
+            plt.plot(range(rolling - 1, len(v)), math.rolling(v, rolling), label=k)
 
     plt.legend()
-    plt.show()
+
 
 
 def plot_strategies(info: SimulatorInfo, rolling: int = 1, figsize=(6, 6)):
@@ -59,10 +58,10 @@ def plot_strategies(info: SimulatorInfo, rolling: int = 1, figsize=(6, 6)):
 
     for tr_type in ['Fundamentalist', 'Chartist']:
         v = [sum([t == tr_type for t in v.values()]) for v in info.types]
-        plt.plot(range(rolling, len(v)), math.rolling(v, rolling), label=tr_type)
+        plt.plot(range(rolling - 1, len(v)), math.rolling(v, rolling), label=tr_type)
 
     plt.legend()
-    plt.show()
+
 
 
 def plot_strategies2(info: SimulatorInfo, rolling: int = 1, figsize=(6, 6)):
@@ -72,8 +71,8 @@ def plot_strategies2(info: SimulatorInfo, rolling: int = 1, figsize=(6, 6)):
     plt.ylabel('Share of Chartists among Traders')
 
     v = [sum([t == 'Chartist' for t in v.values()]) / len(v) for v in info.types]
-    plt.plot(range(rolling, len(v)), math.rolling(v, rolling), color='black')
-    plt.show()
+    plt.plot(range(rolling - 1, len(v)), math.rolling(v, rolling), color='black')
+
 
 
 def plot_sentiments(info: SimulatorInfo, rolling: int = 1, figsize=(6, 6)):
@@ -84,10 +83,10 @@ def plot_sentiments(info: SimulatorInfo, rolling: int = 1, figsize=(6, 6)):
 
     for tr_type in ['Optimistic', 'Pessimistic']:
         v = [sum([t == tr_type for t in v.values()]) for v in info.sentiments]
-        plt.plot(range(rolling, len(v)), math.rolling(v, rolling), label=tr_type)
+        plt.plot(range(rolling - 1, len(v)), math.rolling(v, rolling), label=tr_type)
 
     plt.legend()
-    plt.show()
+
 
 
 def plot_sentiments2(info: SimulatorInfo, rolling: int = 1, figsize=(6, 6)):
@@ -97,9 +96,9 @@ def plot_sentiments2(info: SimulatorInfo, rolling: int = 1, figsize=(6, 6)):
     plt.ylabel('Share of Pessimists among Chartists')
 
     v = [sum([t == 'Pessimistic' for t in v.values()]) / len(v) for v in info.sentiments]
-    plt.plot(range(rolling, len(v)), math.rolling(v, rolling), color='black')
+    plt.plot(range(rolling - 1, len(v)), math.rolling(v, rolling), color='black')
 
-    plt.show()
+
 
 
 def plot_returns(info: SimulatorInfo, rolling: int = 1, figsize=(6, 6)):
@@ -112,12 +111,12 @@ def plot_returns(info: SimulatorInfo, rolling: int = 1, figsize=(6, 6)):
     data = math.aggregate(info.types, info.returns, labels)
     for k, v in data.items():
         try:
-            plt.plot(range(rolling, len(v)), math.rolling(v, rolling), label=k)
+            plt.plot(range(rolling - 1, len(v)), math.rolling(v, rolling), label=k)
         except:
             plt.plot(v, label=k)
 
-    plt.plot(range(rolling, (len(info.returns))), [info.exchange.risk_free] * (len(info.returns) - rolling),
+    plt.plot(range(rolling - 1, (len(info.returns))), [info.exchange.risk_free] * (len(info.returns) - rolling + 1),
              ls='--', color='black', label='risk-free rate')
 
     plt.legend()
-    plt.show()
+
