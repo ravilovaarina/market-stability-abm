@@ -179,11 +179,11 @@ def plot_results(agg, df, shock_dp, save='h1_v3_results.png'):
     x = agg['fast_share']
 
     metrics = [
-        ('vol_ratio_mean',    'vol_ratio_std',    'crimson',   'Волатильность после/до шока',   1.0),
-        ('spread_ratio_mean', 'spread_ratio_std', 'darkgreen', 'Спред после/до шока',            1.0),
-        ('recovery_mean',     'recovery_std',     'navy',      'Время восстановления (итерации)', None),
-        ('drawdown_mean',     'drawdown_std',      'darkorange','Макс. просадка цены (%)',        None),
-        ('mm_panic_mean',     'mm_panic_std',      'purple',   'Паника MarketMaker',              None),
+        ('vol_ratio_mean',    'vol_ratio_std',    'crimson',   'Volatility after/before shock',   1.0),
+        ('spread_ratio_mean', 'spread_ratio_std', 'darkgreen', 'Spread after/before shock',            1.0),
+        ('recovery_mean',     'recovery_std',     'navy',      'Recovery time (iterations)', None),
+        ('drawdown_mean',     'drawdown_std',      'darkorange','Max. price drawdown (%)',        None),
+        ('mm_panic_mean',     'mm_panic_std',      'purple',   'MarketMaker panic',              None),
     ]
 
     positions = [gs[0,0], gs[0,1], gs[0,2], gs[1,0], gs[1,1]]
@@ -194,13 +194,13 @@ def plot_results(agg, df, shock_dp, save='h1_v3_results.png'):
         ax.fill_between(x, agg[col_m]-agg[col_s],
                            agg[col_m]+agg[col_s], alpha=0.2, color=color)
         if baseline is not None:
-            ax.axhline(baseline, color='black', ls='--', lw=1, label=f'Базовый уровень ({baseline})')
+            ax.axhline(baseline, color='black', ls='--', lw=1, label=f'Baseline ({baseline})')
 
         tp = find_tipping_point(agg, col_m)
         if tp is not None:
             ax.axvline(tp, color='orange', ls=':', lw=2, label=f'Tipping point ({tp})')
 
-        ax.set(title=title, xlabel='Доля быстрых агентов')
+        ax.set(title=title, xlabel='Fast agent share')
         ax.legend(fontsize=7); ax.grid(alpha=0.3)
 
     # Сводный график — все нормированные метрики на одном
@@ -209,14 +209,14 @@ def plot_results(agg, df, shock_dp, save='h1_v3_results.png'):
         norm = agg[col_m] / agg[col_m].iloc[0]  # нормируем на значение при fast_share=0
         ax.plot(x, norm, 'o-', color=color, lw=1.5,
                 label=label.split('(')[0].strip()[:20])
-    ax.axhline(1.0, color='black', ls='--', lw=1, label='Базовый уровень')
-    ax.set(title='Все метрики (норм. к fast_share=0)',
-           xlabel='Доля быстрых агентов', ylabel='Относительное изменение')
+    ax.axhline(1.0, color='black', ls='--', lw=1, label='Baseline')
+    ax.set(title='All metrics (norm. to fast_share=0)',
+           xlabel='Fast agent share', ylabel='Relative change')
     ax.legend(fontsize=6); ax.grid(alpha=0.3)
 
     plt.suptitle(
-        f'Гипотеза 1 v3: Прямые метрики нестабильности\n'
-        f'шок dp={shock_dp} | fast_access=5, slow_access=1 | 10 прогонов',
+        f'Hypothesis 1 v3: Direct instability metrics\n'
+        f'shock dp={shock_dp} | fast_access=5, slow_access=1 | 10 runs',
         fontsize=12, fontweight='bold'
     )
     plt.savefig(save, dpi=150, bbox_inches='tight')
@@ -228,12 +228,12 @@ def plot_price_examples(shock_dp=-10, save='h1_v3_price_examples.png'):
     for ax, fs in zip(axes.flatten(), [0.0, 0.3, 0.6, 1.0]):
         res = run_one(fs, shock_dp=shock_dp, seed=42)
         ax.plot(res['prices'], color='black', lw=0.8)
-        ax.axvline(200, color='red', ls='--', lw=1.5, label='Шок')
-        ax.axhline(mean(res['prices'][:200]), color='blue', ls=':', lw=1, label='Средняя до шока')
+        ax.axvline(200, color='red', ls='--', lw=1.5, label='Shock')
+        ax.axhline(mean(res['prices'][:200]), color='blue', ls=':', lw=1, label='Pre-shock mean')
         ax.set(title=f'fast_share={fs} | drawdown={res["max_drawdown"]:.2f} | recovery={res["recovery_time"]}',
-               xlabel='Итерация', ylabel='Цена')
+               xlabel='Iteration', ylabel='Price')
         ax.legend(fontsize=7); ax.grid(alpha=0.3)
-    plt.suptitle(f'Примеры ценовых путей | шок dp={shock_dp}', fontsize=13, fontweight='bold')
+    plt.suptitle(f'Sample price paths | shock dp={shock_dp}', fontsize=13, fontweight='bold')
     plt.tight_layout()
     plt.savefig(save, dpi=150, bbox_inches='tight')
     print(f'Сохранено: {save}')

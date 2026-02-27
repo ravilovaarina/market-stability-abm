@@ -166,11 +166,11 @@ def plot_results(agg, shock_dp, save='h1_v5_results.png'):
     x = agg['fast_share']
 
     metrics = [
-        ('vol_ratio_mean',    'vol_ratio_std',    'crimson',    'Волатильность после/до шока',    1.0),
-        ('spread_ratio_mean', 'spread_ratio_std', 'darkgreen',  'Спред после/до шока',             1.0),
-        ('recovery_mean',     'recovery_std',     'navy',       'Время восстановления (итерации)', None),
-        ('drawdown_mean',     'drawdown_std',      'darkorange', 'Макс. просадка цены',            None),
-        ('mm_panic_mean',     'mm_panic_std',      'purple',    'Паника MarketMaker',              None),
+        ('vol_ratio_mean',    'vol_ratio_std',    'crimson',    'Volatility after/before shock',    1.0),
+        ('spread_ratio_mean', 'spread_ratio_std', 'darkgreen',  'Spread after/before shock',             1.0),
+        ('recovery_mean',     'recovery_std',     'navy',       'Recovery time (iterations)', None),
+        ('drawdown_mean',     'drawdown_std',      'darkorange', 'Max. price drawdown',            None),
+        ('mm_panic_mean',     'mm_panic_std',      'purple',    'MarketMaker panic',              None),
     ]
     positions = [gs[0,0], gs[0,1], gs[0,2], gs[1,0], gs[1,1]]
 
@@ -182,14 +182,14 @@ def plot_results(agg, shock_dp, save='h1_v5_results.png'):
         handles = []
         if baseline is not None:
             h = ax.axhline(baseline, color='black', ls='--', lw=1,
-                           label=f'Базовый уровень ({baseline})')
+                           label=f'Baseline ({baseline})')
             handles.append(h)
         tp = find_tipping_point(agg, col_m)
         if tp is not None:
             h = ax.axvline(tp, color='orange', ls=':', lw=2,
                            label=f'Tipping point ({tp})')
             handles.append(h)
-        ax.set(title=title, xlabel='Доля быстрых агентов')
+        ax.set(title=title, xlabel='Fast agent share')
         if handles:
             ax.legend(fontsize=7)
         ax.grid(alpha=0.3)
@@ -199,15 +199,15 @@ def plot_results(agg, shock_dp, save='h1_v5_results.png'):
     for col_m, _, color, label, _ in metrics:
         norm = agg[col_m] / agg[col_m].iloc[0]
         ax.plot(x, norm, 'o-', color=color, lw=1.5, label=label[:22])
-    ax.axhline(1.0, color='black', ls='--', lw=1, label='Базовый уровень')
-    ax.set(title='Все метрики (норм. к fast_share=0)',
-           xlabel='Доля быстрых агентов', ylabel='Относительное изменение')
+    ax.axhline(1.0, color='black', ls='--', lw=1, label='Baseline')
+    ax.set(title='All metrics (norm. to fast_share=0)',
+           xlabel='Fast agent share', ylabel='Relative change')
     ax.legend(fontsize=6)
     ax.grid(alpha=0.3)
 
     plt.suptitle(
-        f'Гипотеза 1 v5: чистый эффект скорости (access=1 у всех)\n'
-        f'10 Fund + 10 Chart + 1 MM | шок dp={shock_dp} | 30 прогонов',
+        f'Hypothesis 1 v5: pure speed effect (access=1 for all)\n'
+        f'10 Fund + 10 Chart + 1 MM | shock dp={shock_dp} | 30 runs',
         fontsize=12, fontweight='bold'
     )
     plt.savefig(save, dpi=150, bbox_inches='tight')

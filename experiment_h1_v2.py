@@ -133,20 +133,20 @@ def plot_shock_sweep(df_sweep, save='h1_shock_sweep.png'):
     axes[0].set_yticklabels([str(i) for i in pivot.index])
     axes[0].set_xlabel('fast_share')
     axes[0].set_ylabel('shock_dp')
-    axes[0].set_title('Crisis Share (красный = кризис)')
+    axes[0].set_title('Crisis Share (red = crisis)')
     plt.colorbar(im, ax=axes[0])
 
     # Линии по dp
     for dp in df_sweep['shock_dp'].unique():
         sub = df_sweep[df_sweep['shock_dp'] == dp].groupby('fast_share')['crisis_share'].mean()
         axes[1].plot(sub.index, sub.values, 'o-', label=f'dp={dp}', linewidth=1.5)
-    axes[1].axhline(0.3, color='black', ls='--', lw=1, label='Порог 0.3')
-    axes[1].set(title='Crisis Share по fast_share для разных шоков',
+    axes[1].axhline(0.3, color='black', ls='--', lw=1, label='Threshold 0.3')
+    axes[1].set(title='Crisis Share by fast_share for different shocks',
                 xlabel='fast_share', ylabel='crisis_share', ylim=(0, 1))
     axes[1].legend(fontsize=8)
     axes[1].grid(alpha=0.3)
 
-    plt.suptitle('Поиск оптимального шока для обнаружения Tipping Point', fontsize=12, fontweight='bold')
+    plt.suptitle('Search for optimal shock to detect Tipping Point', fontsize=12, fontweight='bold')
     plt.tight_layout()
     plt.savefig(save, dpi=150, bbox_inches='tight')
     print(f'Сохранено: {save}')
@@ -166,27 +166,27 @@ def plot_main(agg, df, shock_dp, save='h1_results_v2.png'):
     ax.plot(x, agg['crisis_mean'], 'o-', color='crimson', lw=2)
     ax.fill_between(x, agg['crisis_mean']-agg['crisis_std'],
                        agg['crisis_mean']+agg['crisis_std'], alpha=0.2, color='crimson')
-    ax.axhline(0.3, color='black', ls='--', lw=1, label='Порог кризиса (0.3)')
+    ax.axhline(0.3, color='black', ls='--', lw=1, label='Crisis threshold (0.3)')
     vline(ax); ax.legend(fontsize=8); ax.grid(alpha=0.3)
-    ax.set(title='Доля кризисных состояний (после шока)',
-           xlabel='Доля быстрых агентов', ylabel='Доля panic/disaster окон', ylim=(0, 1))
+    ax.set(title='Crisis state share (post-shock)',
+           xlabel='Fast agent share', ylabel='Fraction of panic/disaster windows', ylim=(0, 1))
 
     ax = fig.add_subplot(gs[0, 1])
     ax.plot(x, agg['mm_panic_mean'], 's-', color='navy', lw=2)
     ax.fill_between(x, agg['mm_panic_mean']-agg['mm_panic_std'],
                        agg['mm_panic_mean']+agg['mm_panic_std'], alpha=0.2, color='navy')
     vline(ax); ax.legend(fontsize=8); ax.grid(alpha=0.3)
-    ax.set(title='Паника MarketMaker (после шока)',
-           xlabel='Доля быстрых агентов', ylabel='Доля итераций в панике', ylim=(0, 1))
+    ax.set(title='MarketMaker panic (post-shock)',
+           xlabel='Fast agent share', ylabel='Fraction of panic iterations', ylim=(0, 1))
 
     ax = fig.add_subplot(gs[1, 0])
     ax.plot(x, agg['spread_mean'], '^-', color='darkgreen', lw=2)
     ax.fill_between(x, agg['spread_mean']-agg['spread_std'],
                        agg['spread_mean']+agg['spread_std'], alpha=0.2, color='darkgreen')
-    ax.axhline(1.0, color='black', ls='--', lw=1, label='Базовый уровень')
+    ax.axhline(1.0, color='black', ls='--', lw=1, label='Baseline')
     vline(ax); ax.legend(fontsize=8); ax.grid(alpha=0.3)
-    ax.set(title='Спред после / до шока',
-           xlabel='Доля быстрых агентов', ylabel='Отношение спредов')
+    ax.set(title='Spread after / before shock',
+           xlabel='Fast agent share', ylabel='Spread ratio')
 
     ax = fig.add_subplot(gs[1, 1])
     groups = [df[df['fast_share']==fs]['crisis_share'].values
@@ -195,12 +195,12 @@ def plot_main(agg, df, shock_dp, save='h1_results_v2.png'):
     ax.boxplot(groups, labels=labels, patch_artist=True,
                boxprops=dict(facecolor='lightyellow', color='black'),
                medianprops=dict(color='crimson', lw=2))
-    ax.axhline(0.3, color='black', ls='--', lw=1, label='Порог кризиса')
+    ax.axhline(0.3, color='black', ls='--', lw=1, label='Crisis threshold')
     ax.legend(fontsize=8); ax.grid(alpha=0.3, axis='y')
-    ax.set(title='Разброс по прогонам (crisis_share)',
-           xlabel='Доля быстрых агентов', ylabel='Crisis share')
+    ax.set(title='Variance across runs (crisis_share)',
+           xlabel='Fast agent share', ylabel='Crisis share')
 
-    plt.suptitle(f'Гипотеза 1: Tipping Point | шок dp={shock_dp} | fast_access=5, slow_access=1',
+    plt.suptitle(f'Hypothesis 1: Tipping Point | shock dp={shock_dp} | fast_access=5, slow_access=1',
                  fontsize=12, fontweight='bold')
     plt.savefig(save, dpi=150, bbox_inches='tight')
     print(f'Сохранено: {save}')
