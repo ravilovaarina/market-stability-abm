@@ -385,18 +385,18 @@ def plot_results(agg, shock_dp, save='h1_v9_results.png'):
     gs  = gridspec.GridSpec(3, 3, figure=fig, hspace=0.48, wspace=0.35)
 
     metrics = [
-        ('vol_ratio_mean',    'vol_ratio_std',    'Волатильность: после/до шока',    1.0),
-        ('spread_ratio_mean', 'spread_ratio_std', 'Спред: после/до шока (ликвидность)', 1.0),
-        ('drawdown_mean',     'drawdown_std',      'Макс. просадка цены',            None),
-        ('recovery_mean',     'recovery_std',      'Время восстановления (итераций)',  None),
-        ('mm_panic_mean',     'mm_panic_std',      'Паника MarketMaker',             None),
+        ('vol_ratio_mean',    'vol_ratio_std',    'Volatility: after/before shock',    1.0),
+        ('spread_ratio_mean', 'spread_ratio_std', 'Spread: after/before shock (liquidity)', 1.0),
+        ('drawdown_mean',     'drawdown_std',      'Max. price drawdown',            None),
+        ('recovery_mean',     'recovery_std',      'Recovery time (iterations)',  None),
+        ('mm_panic_mean',     'mm_panic_std',      'MarketMaker panic',             None),
     ]
 
     for idx, (col_m, col_s, title, baseline_val) in enumerate(metrics):
         ax = fig.add_subplot(gs[idx // 3, idx % 3])
         for lag, color in zip(lags, colors):
             sub = agg[agg['lag'] == lag]
-            label = f'lag={lag}' + (' (нет задержки)' if lag == 0 else '')
+            label = f'lag={lag}' + (' (no delay)' if lag == 0 else '')
             ax.plot(sub['hft_frac'], sub[col_m], 'o-', color=color, lw=2, label=label)
             ax.fill_between(sub['hft_frac'],
                             sub[col_m] - sub[col_s],
@@ -404,7 +404,7 @@ def plot_results(agg, shock_dp, save='h1_v9_results.png'):
                             alpha=0.12, color=color)
 
         if baseline_val is not None:
-            ax.axhline(baseline_val, color='black', ls='--', lw=1, alpha=0.5, label='Базовый уровень')
+            ax.axhline(baseline_val, color='black', ls='--', lw=1, alpha=0.5, label='Baseline')
 
         # Tipping point для lag=5
         if 5 in lags:
@@ -413,7 +413,7 @@ def plot_results(agg, shock_dp, save='h1_v9_results.png'):
                 ax.axvline(tp, color='orange', ls=':', lw=2, label=f'Tipping (lag=5): {tp}')
 
         ax.set(title=title,
-               xlabel='Доля быстрых чартистов (hft_frac)',
+               xlabel='Fast chartist share (hft_frac)',
                ylabel=col_m.replace('_mean', ''))
         ax.legend(fontsize=7)
         ax.grid(alpha=0.3)
@@ -427,7 +427,7 @@ def plot_results(agg, shock_dp, save='h1_v9_results.png'):
                              pivot.index.min() - 0.5,
                              pivot.index.max() + 0.5])
     ax_h.set_yticks(pivot.index)
-    ax_h.set(title='Heatmap: волатильность\n(темнее = выше)',
+    ax_h.set(title='Heatmap: volatility\n(darker = higher)',
              xlabel='hft_frac', ylabel='lag')
     plt.colorbar(im, ax=ax_h, fraction=0.04)
 
@@ -445,16 +445,16 @@ def plot_results(agg, shock_dp, save='h1_v9_results.png'):
         ])
     t = ax_t.table(
         cellText=tp_data,
-        colLabels=['Условие', 'Tipping Vol', 'Tipping Spread'],
+        colLabels=['Condition', 'Tipping Vol', 'Tipping Spread'],
         cellLoc='center', loc='center'
     )
     t.auto_set_font_size(True)
-    ax_t.set_title('Tipping points (порог ×1.3)', fontsize=9)
+    ax_t.set_title('Tipping points (threshold ×1.3)', fontsize=9)
 
     plt.suptitle(
-        f'Гипотеза H1 v9: TrendChartist + информационная задержка\n'
-        f'10 Fundamentalists (медленные) + 10 TrendChartists (fast/slow) + 1 MM\n'
-        f'Шок dp={shock_dp} при t=200 | {30} прогонов | fast-first, без extra call',
+        f'Hypothesis H1 v9: TrendChartist + information delay\n'
+        f'10 Fundamentalists (slow) + 10 TrendChartists (fast/slow) + 1 MM\n'
+        f'Shock dp={shock_dp} at t=200 | {30} runs | fast-first, no extra call',
         fontsize=12, fontweight='bold'
     )
     plt.savefig(save, dpi=150, bbox_inches='tight')
@@ -476,13 +476,13 @@ def plot_price_examples(lag=5, hft_fracs_to_show=None, shock_it=200,
                         shock_it=shock_it, shock_dp=shock_dp, seed=seed)
             color = plt.cm.Blues(0.4 + seed * 0.12)
             ax.plot(r['prices'], color=color, lw=0.9, alpha=0.85)
-        ax.axvline(shock_it, color='red', ls='--', lw=1.5, label='Шок')
+        ax.axvline(shock_it, color='red', ls='--', lw=1.5, label='Shock')
         ax.set(title=f'hft_frac={fs} (lag={lag})',
-               xlabel='Итерации', ylabel='Цена')
+               xlabel='Iterations', ylabel='Price')
         ax.legend(fontsize=8)
         ax.grid(alpha=0.3)
 
-    plt.suptitle(f'Примеры цен при lag={lag} | TrendChartist v9',
+    plt.suptitle(f'Sample prices at lag={lag} | TrendChartist v9',
                  fontsize=12, fontweight='bold')
     plt.tight_layout()
     plt.savefig(save, dpi=150, bbox_inches='tight')

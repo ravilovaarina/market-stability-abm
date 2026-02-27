@@ -186,16 +186,16 @@ def plot_results(agg, shock_dp, save='h1_v8_results.png'):
     fig, axes = plt.subplots(2, 3, figsize=(18, 11))
 
     metrics = [
-        ('vol_ratio_mean',    'vol_ratio_std',    'Волатильность после/до шока',    1.0),
-        ('spread_ratio_mean', 'spread_ratio_std', 'Спред после/до шока',             1.0),
-        ('drawdown_mean',     'drawdown_std',      'Макс. просадка цены',            None),
-        ('mm_panic_mean',     'mm_panic_std',      'Паника MarketMaker',             None),
-        ('equity_gap_mean',   'equity_gap_std',    'Разрыв доходности (fast-slow)',  0.0),
+        ('vol_ratio_mean',    'vol_ratio_std',    'Volatility after/before shock',    1.0),
+        ('spread_ratio_mean', 'spread_ratio_std', 'Spread after/before shock',             1.0),
+        ('drawdown_mean',     'drawdown_std',      'Max. price drawdown',            None),
+        ('mm_panic_mean',     'mm_panic_std',      'MarketMaker panic',             None),
+        ('equity_gap_mean',   'equity_gap_std',    'Return gap (fast-slow)',  0.0),
     ]
 
     for ax, (col_m, col_s, title, baseline) in zip(axes.flatten(), metrics):
-        for fr, color, label in [(True, 'crimson', 'С front-running'),
-                                  (False, 'steelblue', 'Без front-running')]:
+        for fr, color, label in [(True, 'crimson', 'With front-running'),
+                                  (False, 'steelblue', 'Without front-running')]:
             sub = agg[agg['front_running'] == fr]
             x = sub['fast_share']
             ax.plot(x, sub[col_m], 'o-', color=color, lw=2, label=label)
@@ -205,14 +205,14 @@ def plot_results(agg, shock_dp, save='h1_v8_results.png'):
 
         if baseline is not None:
             ax.axhline(baseline, color='black', ls='--', lw=1,
-                       label='Базовый уровень')
+                       label='Baseline')
 
         tp = find_tipping_point(agg, True, col_m)
         if tp is not None:
             ax.axvline(tp, color='orange', ls=':', lw=2,
                        label=f'Tipping point ({tp})')
 
-        ax.set(title=title, xlabel='Доля быстрых агентов')
+        ax.set(title=title, xlabel='Fast agent share')
         ax.legend(fontsize=7)
         ax.grid(alpha=0.3)
 
@@ -226,14 +226,14 @@ def plot_results(agg, shock_dp, save='h1_v8_results.png'):
         ax.plot(sub_fr['fast_share'], diff, 'o-', lw=1.5,
                 label=label[:20])
     ax.axhline(0, color='black', ls='--', lw=1)
-    ax.set(title='Эффект front-running\n(с FR минус без FR)',
-           xlabel='Доля быстрых агентов')
+    ax.set(title='Front-running effect\n(with FR minus without FR)',
+           xlabel='Fast agent share')
     ax.legend(fontsize=6)
     ax.grid(alpha=0.3)
 
     plt.suptitle(
-        f'Гипотеза 1 v8: front-running механизм\n'
-        f'10 Fund + 10 Chart + 1 MM | шок dp={shock_dp} | 30 прогонов',
+        f'Hypothesis 1 v8: front-running mechanism\n'
+        f'10 Fund + 10 Chart + 1 MM | shock dp={shock_dp} | 30 runs',
         fontsize=12, fontweight='bold'
     )
     plt.tight_layout()

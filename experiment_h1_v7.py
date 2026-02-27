@@ -171,10 +171,10 @@ def plot_results(agg, shock_dp, save='h1_v7_results.png'):
 
     fig, axes = plt.subplots(2, 2, figsize=(16, 11))
     metrics = [
-        ('vol_ratio_mean',    'Волатильность после/до шока',    1.0),
-        ('spread_ratio_mean', 'Спред после/до шока',             1.0),
-        ('drawdown_mean',     'Макс. просадка цены',             None),
-        ('mm_panic_mean',     'Паника MarketMaker (после шока)', None),
+        ('vol_ratio_mean',    'Volatility after/before shock',    1.0),
+        ('spread_ratio_mean', 'Spread after/before shock',             1.0),
+        ('drawdown_mean',     'Max. price drawdown',             None),
+        ('mm_panic_mean',     'MarketMaker panic (post-shock)', None),
     ]
 
     for ax, (col, title, baseline) in zip(axes.flatten(), metrics):
@@ -184,14 +184,14 @@ def plot_results(agg, shock_dp, save='h1_v7_results.png'):
                     color=color, lw=2, label=f'lag={lag}')
         if baseline is not None:
             ax.axhline(baseline, color='black', ls='--', lw=1,
-                       label='Базовый уровень')
-        ax.set(title=title, xlabel='Доля быстрых агентов')
+                       label='Baseline')
+        ax.set(title=title, xlabel='Fast agent share')
         ax.legend(fontsize=8)
         ax.grid(alpha=0.3)
 
     plt.suptitle(
-        f'Гипотеза 1 v7: задержка цены для медленных агентов\n'
-        f'10 Fund + 10 Chart + 1 MM | шок dp={shock_dp} | 20 прогонов',
+        f'Hypothesis 1 v7: price delay for slow agents\n'
+        f'10 Fund + 10 Chart + 1 MM | shock dp={shock_dp} | 20 runs',
         fontsize=12, fontweight='bold'
     )
     plt.tight_layout()
@@ -208,7 +208,7 @@ def plot_heatmap(agg, col, title, save='h1_v7_heatmap.png'):
     ax.set_yticks(range(len(pivot.index)))
     ax.set_yticklabels([str(i) for i in pivot.index])
     ax.set_xlabel('fast_share')
-    ax.set_ylabel('lag (итераций)')
+    ax.set_ylabel('lag (iterations)')
     ax.set_title(title)
     plt.colorbar(im, ax=ax)
     plt.tight_layout()
@@ -250,9 +250,9 @@ if __name__ == '__main__':
     print('\n[2/2] Графики...')
     plot_results(agg, shock_dp=SHOCK_DP)
     plot_heatmap(agg, 'vol_ratio_mean',
-                 'Волатильность после/до шока: fast_share × lag',
+                 'Volatility after/before shock: fast_share × lag',
                  save='h1_v7_heatmap_vol.png')
     plot_heatmap(agg, 'mm_panic_mean',
-                 'Паника MM: fast_share × lag',
+                 'MM panic: fast_share × lag',
                  save='h1_v7_heatmap_panic.png')
     print('\nГотово!')
