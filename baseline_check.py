@@ -61,29 +61,32 @@ print(f'  Crisis share (panic+disaster): {crisis_sh:.3f}')
 # --- Графики ---
 fig, axes = plt.subplots(2, 2, figsize=(14, 8))
 
-# Цены
+# --- Plots ---
+fig, axes = plt.subplots(2, 2, figsize=(14, 8))
+
+# Prices
 axes[0,0].plot(sim_no.info.prices, color='black', lw=0.8)
-axes[0,0].set(title='Цена — БЕЗ шока', xlabel='Итерация', ylabel='Цена')
+axes[0,0].set(title='Price — WITHOUT shock', xlabel='Iteration', ylabel='Price')
 axes[0,0].grid(alpha=0.3)
 
 axes[0,1].plot(sim_sh.info.prices, color='black', lw=0.8)
-axes[0,1].axvline(200, color='red', ls='--', lw=1.5, label='Шок dp=-10')
-axes[0,1].set(title='Цена — С шоком dp=-10', xlabel='Итерация', ylabel='Цена')
+axes[0,1].axvline(200, color='red', ls='--', lw=1.5, label='Shock dp=-10')
+axes[0,1].set(title='Price — WITH shock dp=-10', xlabel='Iteration', ylabel='Price')
 axes[0,1].legend(); axes[0,1].grid(alpha=0.3)
 
-# Волатильность
+# Volatility
 vol_no = sim_no.info.price_volatility(window=10)
 vol_sh = sim_sh.info.price_volatility(window=10)
 axes[1,0].plot(vol_no, color='steelblue', lw=1)
-axes[1,0].set(title='Волатильность — БЕЗ шока', xlabel='Итерация', ylabel='Std цены (window=10)')
+axes[1,0].set(title='Volatility — WITHOUT shock', xlabel='Iteration', ylabel='Price std (window=10)')
 axes[1,0].grid(alpha=0.3)
 
 axes[1,1].plot(vol_sh, color='steelblue', lw=1)
-axes[1,1].axvline(200, color='red', ls='--', lw=1.5, label='Шок dp=-10')
-axes[1,1].set(title='Волатильность — С шоком dp=-10', xlabel='Итерация', ylabel='Std цены (window=10)')
+axes[1,1].axvline(200, color='red', ls='--', lw=1.5, label='Shock dp=-10')
+axes[1,1].set(title='Volatility — WITH shock dp=-10', xlabel='Iteration', ylabel='Price std (window=10)')
 axes[1,1].legend(); axes[1,1].grid(alpha=0.3)
 
-plt.suptitle(f'Диагностика: crisis_share без шока = {crisis_no:.2f}, с шоком = {crisis_sh:.2f}',
+plt.suptitle(f'Diagnostics: crisis_share without shock = {crisis_no:.2f}, with shock = {crisis_sh:.2f}',
              fontsize=12, fontweight='bold')
 plt.tight_layout()
 plt.savefig('h1_baseline_check_prices_volatility.png', dpi=150, bbox_inches='tight')

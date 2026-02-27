@@ -109,27 +109,27 @@ def plot_main(agg, df, save='h1_results.png'):
     ax.plot(x, agg['crisis_mean'], 'o-', color='crimson', lw=2)
     ax.fill_between(x, agg['crisis_mean']-agg['crisis_std'],
                        agg['crisis_mean']+agg['crisis_std'], alpha=0.2, color='crimson')
-    ax.axhline(0.3, color='black', ls='--', lw=1, label='Порог кризиса (0.3)')
+    ax.axhline(0.3, color='black', ls='--', lw=1, label='Crisis threshold (0.3)')
     vline(ax); ax.legend(fontsize=8); ax.grid(alpha=0.3)
-    ax.set(title='Доля кризисных состояний (после шока)',
-           xlabel='Доля быстрых агентов', ylabel='Доля panic/disaster окон', ylim=(0,1))
+    ax.set(title='Share of crisis states (post-shock)',
+           xlabel='Fast agent share', ylabel='Share of panic/disaster windows', ylim=(0,1))
 
     ax = fig.add_subplot(gs[0, 1])
     ax.plot(x, agg['mm_panic_mean'], 's-', color='navy', lw=2)
     ax.fill_between(x, agg['mm_panic_mean']-agg['mm_panic_std'],
                        agg['mm_panic_mean']+agg['mm_panic_std'], alpha=0.2, color='navy')
     vline(ax); ax.legend(fontsize=8); ax.grid(alpha=0.3)
-    ax.set(title='Паника MarketMaker (после шока)',
-           xlabel='Доля быстрых агентов', ylabel='Доля итераций в панике', ylim=(0,1))
+    ax.set(title='MarketMaker panic (post-shock)',
+           xlabel='Fast agent share', ylabel='Share of panic iterations', ylim=(0,1))
 
     ax = fig.add_subplot(gs[1, 0])
     ax.plot(x, agg['spread_mean'], '^-', color='darkgreen', lw=2)
     ax.fill_between(x, agg['spread_mean']-agg['spread_std'],
                        agg['spread_mean']+agg['spread_std'], alpha=0.2, color='darkgreen')
-    ax.axhline(1.0, color='black', ls='--', lw=1, label='Базовый уровень')
+    ax.axhline(1.0, color='black', ls='--', lw=1, label='Baseline level')
     vline(ax); ax.legend(fontsize=8); ax.grid(alpha=0.3)
-    ax.set(title='Спред после / до шока',
-           xlabel='Доля быстрых агентов', ylabel='Отношение спредов')
+    ax.set(title='Spread after / before shock',
+           xlabel='Fast agent share', ylabel='Spread ratio')
 
     ax = fig.add_subplot(gs[1, 1])
     groups = [df[df['fast_share']==fs]['crisis_share'].values
@@ -138,13 +138,13 @@ def plot_main(agg, df, save='h1_results.png'):
     ax.boxplot(groups, labels=labels, patch_artist=True,
                boxprops=dict(facecolor='lightyellow', color='black'),
                medianprops=dict(color='crimson', lw=2))
-    ax.axhline(0.3, color='black', ls='--', lw=1, label='Порог кризиса')
+    ax.axhline(0.3, color='black', ls='--', lw=1, label='Crisis threshold')
     ax.legend(fontsize=8); ax.grid(alpha=0.3, axis='y')
-    ax.set(title='Разброс по прогонам (crisis_share)',
-           xlabel='Доля быстрых агентов', ylabel='Crisis share')
+    ax.set(title='Variance across runs (crisis_share)',
+           xlabel='Fast agent share', ylabel='Crisis share')
 
-    plt.suptitle('Гипотеза 1: Tipping Point при гетерогенности задержек\n'
-                 '10 Fundamentalists + 10 Chartists + 1 MarketMaker | шок it=200, dp=−10',
+    plt.suptitle('Hypothesis 1: Tipping Point under latency heterogeneity\n'
+                 '10 Fundamentalists + 10 Chartists + 1 MarketMaker | shock it=200, dp=-10',
                  fontsize=12, fontweight='bold')
     plt.savefig(save, dpi=150, bbox_inches='tight')
     print(f'Сохранено: {save}')
@@ -156,11 +156,11 @@ def plot_price_examples(save='h1_prices.png'):
     for ax, fs in zip(axes.flatten(), [0.0, 0.3, 0.6, 1.0]):
         res = run_one(fs, seed=42)
         ax.plot(res['prices'], color='black', lw=0.8)
-        ax.axvline(200, color='red', ls='--', lw=1.5, label='Шок (it=200)')
+        ax.axvline(200, color='red', ls='--', lw=1.5, label='Shock (it=200)')
         ax.set(title=f'fast_share={fs} | crisis={res["crisis_share"]:.2f}',
-               xlabel='Итерация', ylabel='Цена')
+               xlabel='Iteration', ylabel='Price')
         ax.legend(fontsize=8); ax.grid(alpha=0.3)
-    plt.suptitle('Примеры ценовых путей при разных fast_share', fontsize=13, fontweight='bold')
+    plt.suptitle('Example price paths for different fast_share', fontsize=13, fontweight='bold')
     plt.tight_layout()
     plt.savefig(save, dpi=150, bbox_inches='tight')
     print(f'Сохранено: {save}')

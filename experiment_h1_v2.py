@@ -151,7 +151,6 @@ def plot_shock_sweep(df_sweep, save='h1_shock_sweep.png'):
     plt.savefig(save, dpi=150, bbox_inches='tight')
     print(f'Сохранено: {save}')
 
-
 def plot_main(agg, df, shock_dp, save='h1_results_v2.png'):
     fig = plt.figure(figsize=(16, 10))
     gs = gridspec.GridSpec(2, 2, hspace=0.4, wspace=0.35)
@@ -203,7 +202,7 @@ def plot_main(agg, df, shock_dp, save='h1_results_v2.png'):
     plt.suptitle(f'Hypothesis 1: Tipping Point | shock dp={shock_dp} | fast_access=5, slow_access=1',
                  fontsize=12, fontweight='bold')
     plt.savefig(save, dpi=150, bbox_inches='tight')
-    print(f'Сохранено: {save}')
+    print(f'Saved: {save}')
 
 
 if __name__ == '__main__':
