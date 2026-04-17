@@ -1,0 +1,15 @@
+speed_mult,info_lag,hft_frac,run,seed,error
+2,5,0.8,20,200852,Simulation took too long
+3,1,0.8,7,70813,Simulation took too long
+3,1,0.8,26,260813,Simulation took too long
+3,1,0.8,27,270813,Simulation took too long
+3,1,0.8,29,290813,Simulation took too long
+3,3,0.6,11,110633,Simulation took too long
+3,3,0.6,19,190633,Simulation took too long
+3,3,0.6,22,220633,Simulation took too long
+3,3,0.8,11,110833,Simulation took too long
+3,3,0.8,13,130833,Simulation took too long
+3,3,0.8,16,160833,Simulation took too long
+3,3,0.8,19,190833,Simulation took too long
+3,3,0.8,20,200833,Simulation took too long
+3,3,0.8,26,260833,Simulation took too long

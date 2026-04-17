@@ -24,18 +24,22 @@ class Simulator:
             trader.cash += trader.assets * self.exchange.dividend()
             trader.cash += trader.cash * self.exchange.risk_free
 
-    def simulate(self, n_iter: int, silent=False, fast_extra_call=False) -> object:
+    def simulate(self, n_iter: int, silent=False, fast_extra_call=False, speed_multiplier=1) -> object:
         """
         :param n_iter: number of iterations
         :param silent: suppress progress bar
         :param fast_extra_call: if True, fast agents get an additional call per iteration
                                 (H1: simulates shorter reaction latency)
+        :param speed_multiplier: fast agents trade this many times per iteration (1 = same as slow)
         """
         for it in tqdm(range(n_iter), desc='Simulation', disable=silent):
             # Call scenario events
             if self.events:
                 for event in self.events:
                     event.call(it)
+
+            # Record order book state for delayed information
+            self.exchange.record_state()
 
             # Capture current state BEFORE trading
             self.info.capture()
@@ -51,12 +55,13 @@ class Simulator:
             fast = [t for t in self.traders if getattr(t, 'speed', 'slow') == 'fast']
             slow = [t for t in self.traders if getattr(t, 'speed', 'slow') != 'fast']
 
-            # Fast agents act first
-            random.shuffle(fast)
-            for trader in fast:
-                trader.call()
+            # Fast agents act first, speed_multiplier times
+            for _ in range(speed_multiplier):
+                random.shuffle(fast)
+                for trader in fast:
+                    trader.call()
 
-            # Extra call for fast agents (shorter latency advantage)
+            # Extra call for fast agents (legacy, kept for backward compat)
             if fast_extra_call and fast:
                 random.shuffle(fast)
                 for trader in fast:
@@ -106,7 +111,11 @@ class SimulatorInfo:
 
     def capture(self):
         # Market Statistics
-        self.prices.append(self.exchange.price())
+        try:
+            price = self.exchange.price()
+        except Exception:
+            price = self.prices[-1] if self.prices else 0
+        self.prices.append(price)
         self.spreads.append(self.exchange.spread())
         self.dividends.append(self.exchange.dividend())
         self.orders.append({

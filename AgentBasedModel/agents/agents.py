@@ -29,6 +29,11 @@ class ExchangeAgent:
         self.transaction_cost = transaction_cost
         self._fill_book(price, std, volume, rf * price)
 
+        # H1 unified: history for delayed information
+        self._spread_history = []
+        self._price_history = []
+        self.max_history = 20
+
     def generate_dividend(self):
         """
         Generate time series on future dividends.
@@ -112,7 +117,16 @@ class ExchangeAgent:
 
         :return: void
         """
-        bid, ask = self.spread().values()
+        spread = self.spread()
+        if spread is None:
+            # No spread — just insert into the book
+            if order.order_type == 'bid':
+                self.order_book['bid'].insert(order)
+            elif order.order_type == 'ask':
+                self.order_book['ask'].insert(order)
+            return
+
+        bid, ask = spread['bid'], spread['ask']
         t_cost = self.transaction_cost
         if not bid or not ask:
             return
@@ -154,17 +168,45 @@ class ExchangeAgent:
         elif order.order_type == 'ask':
             self.order_book['ask'].remove(order)
 
+    def record_state(self):
+        """Snapshot current spread and price for delayed information access."""
+        spread = self.spread()
+        try:
+            price = self.price() if spread else None
+        except Exception:
+            price = self._price_history[-1] if self._price_history else None
+        self._spread_history.append(spread)
+        self._price_history.append(price)
+        if len(self._spread_history) > self.max_history:
+            self._spread_history.pop(0)
+            self._price_history.pop(0)
+
+    def delayed_spread(self, lag=0):
+        """Return spread from `lag` iterations ago."""
+        if lag == 0 or not self._spread_history:
+            return self.spread()
+        idx = max(0, len(self._spread_history) - 1 - lag)
+        return self._spread_history[idx]
+
+    def delayed_price(self, lag=0):
+        """Return price from `lag` iterations ago."""
+        if lag == 0 or not self._price_history:
+            return self.price()
+        idx = max(0, len(self._price_history) - 1 - lag)
+        return self._price_history[idx]
+
 
 class Trader:
     id = 0
 
-    def __init__(self, market: ExchangeAgent, cash: float or int, assets: int = 0):
+    def __init__(self, market: ExchangeAgent, cash: float or int, assets: int = 0, info_lag: int = 0):
         """
         Trader that is activated on call to perform action.
 
         :param market: link to exchange agent
         :param cash: trader's cash available
         :param assets: trader's number of shares hold
+        :param info_lag: information delay in iterations (0 = real-time)
         """
         self.type = 'Unknown'
         self.name = f'Trader{self.id}'
@@ -176,13 +218,32 @@ class Trader:
 
         self.cash = cash
         self.assets = assets
+        self.info_lag = info_lag
 
     def __str__(self) -> str:
         return f'{self.name} ({self.type})'
 
     def equity(self):
-        price = self.market.price() if self.market.price() is not None else 0
+        try:
+            price = self.market.price()
+        except Exception:
+            price = 0
         return self.cash + self.assets * price
+
+    def _get_spread(self):
+        """Return spread with info_lag delay (0 = real-time)."""
+        if self.info_lag == 0:
+            return self.market.spread()
+        return self.market.delayed_spread(self.info_lag)
+
+    def _get_price(self):
+        """Return price with info_lag delay (0 = real-time)."""
+        try:
+            if self.info_lag == 0:
+                return self.market.price()
+            return self.market.delayed_price(self.info_lag)
+        except Exception:
+            return None
 
     def _buy_limit(self, quantity, price):
         order = Order(round(price, 1), round(quantity), 'bid', self)
@@ -221,8 +282,8 @@ class Random(Trader):
     """
     Random creates noisy orders to recreate trading in real environment.
     """
-    def __init__(self, market: ExchangeAgent, cash: float or int, assets: int = 0):
-        super().__init__(market, cash, assets)
+    def __init__(self, market: ExchangeAgent, cash: float or int, assets: int = 0, info_lag: int = 0):
+        super().__init__(market, cash, assets, info_lag=info_lag)
         self.type = 'Random'
 
     @staticmethod
@@ -306,14 +367,15 @@ class Fundamentalist(Trader):
     value, i.e. E(V|Ij,k), they accept the limit order, otherwise they put a new limit order
     between the former best bid and best ask prices.
     """
-    def __init__(self, market: ExchangeAgent, cash: float or int, assets: int = 0, access: int = 1):
+    def __init__(self, market: ExchangeAgent, cash: float or int, assets: int = 0, access: int = 1, info_lag: int = 0):
         """
         :param market: exchange agent link
         :param cash: number of cash
         :param assets: number of assets
         :param access: number of future dividends informed
+        :param info_lag: information delay in iterations
         """
-        super().__init__(market, cash, assets)
+        super().__init__(market, cash, assets, info_lag=info_lag)
         self.type = 'Fundamentalist'
         self.access = access
 
@@ -336,8 +398,8 @@ class Fundamentalist(Trader):
 
     def call(self):
         pf = round(self.evaluate(self.market.dividend(self.access), self.market.risk_free), 1)  # fundamental price
-        p = self.market.price()
-        spread = self.market.spread()
+        p = self._get_price()
+        spread = self._get_spread()
         t_cost = self.market.transaction_cost
 
         if spread is None:
@@ -386,13 +448,14 @@ class Chartist(Trader):
     buys stock or sells. Sentiment revaluation happens at the end of each iteration based on opinion
     propagation among other chartists, current price changes.
     """
-    def __init__(self, market: ExchangeAgent, cash: float or int, assets: int = 0):
+    def __init__(self, market: ExchangeAgent, cash: float or int, assets: int = 0, info_lag: int = 0):
         """
         :param market: exchange agent link
         :param cash: number of cash
         :param assets: number of assets
+        :param info_lag: information delay in iterations
         """
-        super().__init__(market, cash, assets)
+        super().__init__(market, cash, assets, info_lag=info_lag)
         self.type = 'Chartist'
         self.sentiment = 'Optimistic' if random.random() > .5 else 'Pessimistic'
 
@@ -403,7 +466,10 @@ class Chartist(Trader):
         """
         random_state = random.random()
         t_cost = self.market.transaction_cost
-        spread = self.market.spread()
+        spread = self._get_spread()
+
+        if spread is None:
+            return
 
         if self.sentiment == 'Optimistic':
             # Market order
@@ -443,7 +509,10 @@ class Chartist(Trader):
         n_pessimists = sum([tr_type == 'Pessimistic' for tr_type in info.sentiments[-1].values()])
 
         dp = info.prices[-1] - info.prices[-2] if len(info.prices) > 1 else 0  # price derivative
-        p = self.market.price()  # market price
+        try:
+            p = self.market.price()  # market price
+        except Exception:
+            return
         x = (n_optimistic - n_pessimists) / n_chartists
 
         U = a1 * x + a2 / v1 * dp / p
@@ -465,17 +534,18 @@ class Universalist(Fundamentalist, Chartist):
     Universalist mixes Fundamentalist, Chartist trading strategies, and allows to change from
     one strategy to another.
     """
-    def __init__(self, market: ExchangeAgent, cash: float or int, assets: int = 0, access: int = 1):
+    def __init__(self, market: ExchangeAgent, cash: float or int, assets: int = 0, access: int = 1, info_lag: int = 0):
         """
         :param market: exchange agent link
         :param cash: number of cash
         :param assets: number of assets
         :param access: number of future dividends informed
+        :param info_lag: information delay in iterations
         """
-        super().__init__(market, cash, assets)
-        self.type = 'Chartist' if random.random() > .5 else 'Fundamentalist'  # randomly decide type
-        self.sentiment = 'Optimistic' if random.random() > .5 else 'Pessimistic'  # sentiment about trend (Chartist)
-        self.access = access  # next n dividend payments known (Fundamentalist)
+        super().__init__(market, cash, assets, info_lag=info_lag)
+        self.type = 'Chartist' if random.random() > .5 else 'Fundamentalist'
+        self.sentiment = 'Optimistic' if random.random() > .5 else 'Pessimistic'
+        self.access = access
 
     def call(self):
         """
@@ -505,7 +575,10 @@ class Universalist(Fundamentalist, Chartist):
         n_pessimists = sum([tr.sentiment == 'Pessimistic' for tr in info.traders.values() if tr.type == 'Chartist'])
 
         dp = info.prices[-1] - info.prices[-2] if len(info.prices) > 1 else 0  # price derivative
-        p = self.market.price()  # market price
+        try:
+            p = self.market.price()  # market price
+        except Exception:
+            return
         pf = self.evaluate(self.market.dividend(self.access), self.market.risk_free)  # fundamental price
         r = pf * self.market.risk_free  # expected dividend return
         R = mean(info.returns[-1].values())  # average return in economy
@@ -546,8 +619,8 @@ class MarketMaker(Trader):
     spread between bid and ask prices, and maintain its assets to cash ratio in balance.
     """
 
-    def __init__(self, market: ExchangeAgent, cash: float, assets: int = 0, softlimit: int = 100):
-        super().__init__(market, cash, assets)
+    def __init__(self, market: ExchangeAgent, cash: float, assets: int = 0, softlimit: int = 100, info_lag: int = 0):
+        super().__init__(market, cash, assets, info_lag=info_lag)
         self.type = 'Market Maker'
         self.softlimit = softlimit
         self.ul = softlimit
@@ -560,6 +633,10 @@ class MarketMaker(Trader):
             self._cancel_order(order)
 
         spread = self.market.spread()
+
+        if spread is None:
+            self.panic = True
+            return
 
         # Calculate bid and ask volume
         bid_volume = max(0., self.ul - 1 - self.assets)

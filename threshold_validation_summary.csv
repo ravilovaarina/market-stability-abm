@@ -1,0 +1,4 @@
+regime,grid,speed_mult,info_lag,baseline_vol_ratio,note,phi_star_1.1x,phi_star_1.2x,phi_star_1.3x,phi_star_1.4x,phi_star_1.5x
+speed_x2,speed,2,0,1.7459916904523223,Key clean speed regime,0.1,0.1,0.2,0.2,0.4
+combined_speed_x3_lag1,combined,3,1,2.178019172947756,Strong combined regime with stable tipping,0.2,0.2,0.2,0.2,0.6
+combined_speed_x3_lag5,combined,3,5,2.699816515367516,Combined regime where 1.3x tipping disappears,0.6,0.6,,,

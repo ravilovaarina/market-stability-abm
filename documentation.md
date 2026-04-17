@@ -1,0 +1,1021 @@
+# 1D-ABM Project Documentation
+
+## Project Overview
+
+**Title:** Financial Market Stability under Heterogeneous Information Speeds: An Agent-Based Modeling Approach
+
+**Author:** Ravilova Arina Kharisovna, Group БПАД246, 2nd year, HSE University (Faculty of Computer Science, Bachelor's Programme "Data Science and Business Analytics")
+
+**Supervisor:** Lukyanchenko Petr Pavlovich, Head of Lab, Faculty of Computer Science, HSE University
+
+**Original codebase:** https://github.com/bognik002/1D-ABM — a 1D agent-based model of a financial market with a centralized limit order book, developed by Bogdan Nikishin. The author's work extends this simulator to study how latency heterogeneity (differences in information/execution speed between traders) affects market stability.
+
+**Research question:** How do differences in the speed of information acquisition by market participants affect the stability of financial markets? Specifically, does a critical proportion of high-frequency traders create a tipping point between normal liquidity and a "toxic" liquidity crisis?
+
+---
+
+## AI Orientation: Read This First
+
+This section is intended for any future AI assistant entering the workspace.
+
+### What this project is
+
+This repository contains an **agent-based financial market simulator** with:
+- a centralized limit order book,
+- heterogeneous trader types,
+- exogenous market shocks,
+- experiment scripts studying how speed and information delay affect market stability.
+
+The author's research focus is **H1**: whether heterogeneous information / execution speed creates a tipping point in post-shock instability.
+
+### Three layers of the codebase
+
+1. **Core engine** — `AgentBasedModel/`
+   - order book, traders, events, simulator, metrics
+2. **Experiment scripts** — top-level `experiment_*.py`
+   - define populations, grids, metrics, plots, CSV output
+3. **Outputs / presentation artifacts**
+   - raw CSV files, plots, notebook for supervisor discussion
+
+### Current source of truth in this workspace
+
+If you need the **current H1 analysis**, start with:
+- `experiment_unified.py`
+- `unified_speed_raw.csv`
+- `unified_delay_raw.csv`
+- `unified_combined_raw.csv`
+- `unified_all_raw.csv`
+- `documentation.md`
+
+If you need the **best single pre-unified experiment**, use:
+- `experiment_h1_v9.py`
+- `h1_v9_raw.csv`
+
+If you need the **post-unified follow-up analyses**, use:
+- `experiment_threshold_validation.py`
+- `experiment_grid3_rerun.py`
+- `experiment_speed_delay_mannwhitney.py`
+
+If you need the **presentation / defense artifact**, use:
+- `/Users/arinaravilova/Desktop/unified_experiment_talk.ipynb`
+
+### Main parameters and meanings
+
+- `phi` / `hft_frac`
+  - share of fast HFT-type chartists among all chartists
+- `speed_multiplier`
+  - how many times fast agents act per iteration
+- `info_lag`
+  - how many iterations old the visible price/spread information is for delayed agents
+- `vol_ratio`
+  - primary instability metric:
+    - post-shock volatility divided by pre-shock volatility
+- tipping point `phi*`
+  - first `phi` where mean `vol_ratio` crosses the chosen threshold
+- default threshold in this project
+  - `1.3 × baseline`, where baseline = mean `vol_ratio` at `phi=0`
+
+### Experimental logic
+
+- **Grid 1 (speed)**:
+  - fixed `info_lag=0`
+  - asks whether execution-speed asymmetry destabilizes the market
+- **Grid 2 (delay)**:
+  - fixed `speed_multiplier=1`
+  - asks whether stale information destabilizes the market
+- **Grid 3 (combined)**:
+  - varies both speed and delay
+  - asks whether the speed effect survives when delay is also present
+- **Threshold validation**:
+  - checks whether `1.3× baseline` is a reasonable tipping-point rule
+- **Additional Mann-Whitney analyses**:
+  - test speed effect at fixed `phi`
+  - test delay effect at fixed `phi`
+
+### Most reliable conclusions currently supported
+
+- strongest H1 support appears at **moderate speed advantage**, especially `speed×2`
+- information delay raises baseline instability
+- combined speed+delay effects exist, but are **regime-dependent**
+- `speed×5` is a **non-monotonic / extreme regime**, not a stronger confirmation of H1
+
+### Less reliable / incomplete area
+
+- the heaviest part of Grid 3 rerun, especially around `speed×3, lag=5`
+
+### Important pitfalls
+
+- Early files `experiment_h1_v1-v8.py` are historical and not the final modeling logic.
+- The original `Chartist` in `agents.py` is **contrarian**.
+- H1-confirming behavior uses `TrendChartist` / `SlowTrendChartist`, defined inside experiment files.
+- `general_states()` is unreliable for H1 inference; use direct metrics such as `vol_ratio`.
+- Some interpretation files were added later than the original experiments; always distinguish raw simulation output from later presentation artifacts.
+
+---
+
+## Three Hypotheses
+
+### H1: Latency Heterogeneity and the Tipping Point (IMPLEMENTED & TESTED)
+An increase in the proportion of high-frequency traders with execution-speed advantage leads to higher post-shock market volatility and reduced liquidity, exhibiting a non-linear (tipping-point) transition beyond a critical threshold phi*.
+
+**Status:** Confirmed for lag=0. Tipping point found at phi* = 0.4.
+
+### H2: Calendar Time versus Event Time (DESIGNED, NOT YET IMPLEMENTED)
+Updating information in event time (volume clock) as opposed to real calendar time can alter market resilience and shift the boundary at which crises occur. Markets operating on an event-time basis should be more robust, effectively raising the tipping-point threshold.
+
+**Design:** Replace the fixed-iteration loop with a volume-clock loop where one "tick" = reaching a cumulative executed volume threshold V*. Rescale dividend/interest payments per tick.
+
+### H3: Information Delay, Liquidity Constraints, and Volatility Clustering (DESIGNED, NOT YET IMPLEMENTED)
+Combining information delays with liquidity constraints produces volatility clustering, which becomes more severe during crisis regimes. The interaction effect should be superadditive.
+
+**Design:** Introduce `reaction_delay` parameter controlling how often slow agents participate. Factorial grid: delay x softlimit. Measure autocorrelation of absolute returns.
+
+---
+
+## Repository Structure
+
+### Branches
+
+| Branch | Purpose | Key Changes |
+|--------|---------|-------------|
+| `main` | Original baseline simulator from bognik002/1D-ABM with bug fixes | No HFT modifications. Contains the full ABM framework. |
+| `h1-tipping-point` | H1 experiments v1-v6 (failed attempts with contrarian Chartist) | Speed attribute, fast/slow execution split, experiment files v1-v6, h1_description.md |
+| `hft-intraiter` | H1 experiments v1-v9 (includes the fix + successful result) | TrendChartist, SlowTrendChartist, simulator_hft.py, experiment v7-v9, final results |
+
+**Active development branch:** `hft-intraiter` (most complete, contains all work)
+
+### Git History (Main Branch — Original Codebase)
+```
+8a0fb6e Initial commit
+4f1b9d3 minor changes
+01ae3e3 aggToShock
+d0a7f1c states
+e86b835 fix MM
+83fdbc8 chartist chose price as Random, instead of Exchange.price() +- delta
+c29b4ef change strategy bug fix
+b54e525 baseline commit
+```
+
+### Git History (hft-intraiter — Author's Work)
+```
+b54e525 baseline commit (branching point)
+009a6a5 v1-v6 h1 experiments
+45201b0 interim commit
+de5edfa H1 v9: TrendChartist + information latency — H1 confirmed for lag=0
+d690fd3 Translate Russian plot text to English in experiment_h1 files
+cb3937d translate plots
+```
+
+---
+
+## File Tree (hft-intraiter branch — most complete)
+
+```
+1D-ABM/
+├── CLAUDE.md                        # THIS FILE — project documentation
+├── documentation.md                 # Human-readable project documentation (this file)
+├── main.py                          # Original experiment runner (grid search over trader compositions)
+├── baseline_check.py                # Diagnostic: validates baseline behavior without HFT
+├── simulator_hft.py                 # Front-running HFT simulator (InterceptingExchange, used in v8 only)
+│
+├── experiment_h1.py                 # H1 v1: baseline speed experiment
+├── experiment_h1_v2.py              # H1 v2: shock magnitude sweep + access asymmetry
+├── experiment_h1_v3.py              # H1 v3: new direct metrics (vol_ratio, spread_ratio, etc.)
+├── experiment_h1_v4.py              # H1 v4: increased to 30 runs
+├── experiment_h1_v5.py              # H1 v5: pure speed effect (access=1 for all)
+├── experiment_h1_v6.py              # H1 v6: 2D grid over fast_share x softlimit
+├── experiment_h1_v7.py              # H1 v7: declared delayed_price_lag (BUGGY — not passed to simulator)
+├── experiment_h1_v8.py              # H1 v8: front-running via InterceptingExchange
+├── experiment_h1_v9.py              # H1 v9: TrendChartist fix — H1 CONFIRMED
+│
+├── experiment_unified.py            # Unified experiment: Grid 1 (speed), Grid 2 (delay), Grid 3 (combined)
+├── experiment_threshold_validation.py  # Follow-up: justifies 1.3× baseline tipping threshold
+├── experiment_grid3_rerun.py        # Follow-up: targeted Grid 3 rerun with resume support
+├── experiment_speed_delay_mannwhitney.py  # Follow-up: Mann-Whitney tests for speed/delay effects at fixed phi
+│
+├── h1_description.md                # Detailed description of all H1 experiments (Russian)
+├── h1_v9_raw.csv                    # Raw results: 1650 simulations
+├── h1_v9_results.png                # Aggregated metrics plot (6 panels + heatmap + tipping table)
+├── h1_v9_prices.png                 # Price trajectory examples
+├── h1_v*_raw.csv                    # Raw results for earlier versions
+├── h1_v*_results.png                # Plots for earlier versions
+│
+├── unified_speed_raw.csv            # Grid 1 raw results (1,320 rows)
+├── unified_delay_raw.csv            # Grid 2 raw results (1,650 rows)
+├── unified_combined_raw.csv         # Grid 3 raw results (1,056 rows)
+├── unified_all_raw.csv              # All grids concatenated (used by follow-up scripts)
+├── unified_speed.png                # Grid 1 metrics + sensitivity table
+├── unified_delay.png                # Grid 2 metrics + heatmap
+├── unified_stats.png                # Mann-Whitney bar plots + sensitivity table
+│
+├── threshold_validation_summary.csv # Tipping points across thresholds 1.1×–1.5×
+├── threshold_validation.png         # Threshold sensitivity line plot
+├── threshold_validation_heatmap.png # Threshold sensitivity heatmap
+├── threshold_validation_report.md   # Written interpretation of threshold validation
+│
+├── grid3_rerun_raw.csv              # Grid 3 rerun raw results
+├── grid3_rerun_agg.csv              # Grid 3 rerun aggregated
+├── grid3_rerun_skips.csv            # Skipped parameter combinations log
+├── grid3_rerun.png                  # Grid 3 rerun plot
+│
+├── speed_effect_mannwhitney.csv     # Mann-Whitney: speed effect at fixed phi
+├── delay_effect_mannwhitney.csv     # Mann-Whitney: delay effect at fixed phi
+├── speed_effect_mannwhitney.png     # Speed effect plot
+├── delay_effect_mannwhitney.png     # Delay effect plot
+├── speed_delay_effect_mannwhitney_report.md  # Written interpretation
+│
+└── AgentBasedModel/                 # Core framework package
+    ├── __init__.py                  # Exports all submodules
+    ├── agents/
+    │   ├── __init__.py
+    │   └── agents.py               # ExchangeAgent, Trader, Random, Fundamentalist, Chartist,
+    │                                # Universalist, MarketMaker
+    ├── simulator/
+    │   ├── __init__.py
+    │   └── simulator.py            # Simulator, SimulatorInfo (MODIFIED: fast/slow split, mm_panic)
+    ├── events/
+    │   ├── __init__.py
+    │   └── events.py               # MarketPriceShock, FundamentalPriceShock, LiquidityShock,
+    │                                # InformationShock, MarketMakerIn/Out, TransactionCost
+    ├── states/
+    │   ├── __init__.py
+    │   └── states.py               # aggToShock, trend, panic, disaster, mean_rev, general_states
+    ├── utils/
+    │   ├── __init__.py
+    │   ├── orders.py               # Order, OrderList (doubly-linked list order book)
+    │   └── math.py                 # mean, std, quantile, rolling, difference, aggregate
+    └── visualization/
+        ├── __init__.py
+        ├── market.py               # plot_price, plot_volatility_price, plot_liquidity, etc.
+        ├── trader.py               # plot_equity, plot_assets, plot_sentiments, etc.
+        └── other.py                # plot_book, print_book (order book visualization)
+```
+
+---
+
+## Core Architecture (Original Simulator)
+
+### 1. Exchange Agent and Order Book
+
+**Class: `ExchangeAgent`** (`agents/agents.py`)
+
+The exchange implements a centralized limit order book as two sorted doubly-linked lists (`OrderList`), one for bids and one for asks. Each node is an `Order` object with price, quantity, order type, and a back-reference to the placing trader.
+
+**Initialization:**
+- `price=100`: initial stock price
+- `std=25`: standard deviation for initial order distribution
+- `volume=1000`: number of random orders to populate the book
+- `rf=5e-4`: risk-free rate per iteration
+- `transaction_cost=0`: fee per trade
+
+**Order Book Population:** V=1000 orders are generated with prices drawn from N(p0-sigma, sigma) for bids and N(p0+sigma, sigma) for asks, quantities uniform [1,5].
+
+**Key Methods:**
+- `limit_order(order)`: inserts into book; if price crosses spread, fills against opposite side first
+- `market_order(order)`: immediately fills against best available on opposite side
+- `cancel_order(order)`: removes from book
+- `spread()`: returns `{'bid': best_bid, 'ask': best_ask}`
+- `price()`: returns midpoint `(bid + ask) / 2`
+- `dividend(access=None)`: returns current dividend or list of n future dividends
+- `generate_dividend()`: evolves next dividend via `d_new = d_old * exp(N(0, 5e-3))`
+
+**Order Book Data Structure (`OrderList`):**
+- Doubly-linked list maintaining best-offer-first ordering
+- Custom `Order` comparison: "less than" = "better offer" regardless of side
+- `insert(order)`: O(n) maintains sorted order
+- `fulfill(order, t_cost)`: walks from best to worst, matching until filled
+- `append/push/remove`: O(1) operations
+
+### 2. Dividend Process
+
+Stochastic multiplicative process:
+```
+d_{t+1} = max(d_t * exp(epsilon_t), 0),  epsilon ~ N(0, sigma_d^2)
+```
+where sigma_d = 5e-3. Initial dividend = rf * p0. The exchange maintains a rolling list of 100 pre-generated future dividends. Each iteration consumes one and generates a new one.
+
+### 3. Trading Agents
+
+All agents inherit from **`Trader`** base class:
+- Attributes: `cash`, `assets`, `orders` (active orders list), `market` (link to ExchangeAgent)
+- Primitives: `_buy_limit(qty, price)`, `_sell_limit(qty, price)`, `_buy_market(qty)`, `_sell_market(qty)`, `_cancel_order(order)`
+- `equity()`: returns `cash + assets * market.price()`
+
+#### Random Agent
+Simulates background noise/liquidity.
+- 15% chance: market order (buy/sell 50/50), qty uniform [1,5]
+- 35% chance: limit order at price drawn from `draw_price()`:
+  - 35% of time: uniform within spread
+  - 65% of time: outside spread by Exp(lambda=1/std) offset
+- 35% chance: cancel a random active order
+
+#### Fundamentalist Agent
+Trades based on dividend discount valuation.
+- `access` parameter: number of future dividends visible (default 1)
+- Fundamental price formula:
+  ```
+  pf = sum(d_i / (1+rf)^i, i=1..n-1) + (d_n / rf) / (1+rf)^(n-1)
+  ```
+- 55% chance: trade (buy if pf >= ask, sell if pf <= bid, mixed if between)
+- 45% chance: cancel first active order
+- Quantity: `min(|pf - p| / p / 0.005, 5)` (proportional to mispricing, capped at 5)
+
+#### Chartist Agent
+Trades based on sentiment (Optimistic/Pessimistic).
+- Optimists buy, Pessimists sell (same market/limit/cancel probabilities as Random)
+- **Sentiment switching** via `change_sentiment(info)`:
+  ```
+  x = (n_optimistic - n_pessimistic) / n_chartists  (sentiment imbalance)
+  U = a1 * x + (a2 / v1) * dp / p                   (opinion index)
+  ```
+  - Optimist -> Pessimist: prob = v1 * (n_chartists/n_traders) * exp(U)
+  - Pessimist -> Optimist: prob = v1 * (n_chartists/n_traders) * exp(-U)
+
+**CRITICAL NOTE:** The original sign convention produces CONTRARIAN behavior (price falls -> become optimistic -> buy -> stabilize). This is intentional in the original code but was a problem for H1 testing. See "The Sentiment Bug" section below.
+
+#### Universalist Agent
+Multiple inheritance from both Fundamentalist and Chartist.
+- Switches between strategies based on utility comparison of fundamental vs. chartist returns
+- Executes whichever strategy is currently active
+
+#### MarketMaker Agent
+Provides two-sided liquidity within inventory band [-softlimit, +softlimit].
+- Each call: cancels all previous orders, then places new bid/ask
+- Bid volume: `max(0, ul - 1 - assets)`, Ask volume: `max(0, assets - ll - 1)`
+- Inventory-dependent price skew: `delta = -(ask - bid) * assets / softlimit`
+- Sets `panic=True` when either volume reaches zero
+- **Note:** The rebalancing logic in the panic branch checks for `None` instead of zero, so the market-order rebalancing is never triggered. The panic flag is set but not operationally acted upon. This is a known quirk of the original code.
+
+### 4. Simulation Loop
+
+**Class: `Simulator`** (`simulator/simulator.py`)
+
+Each iteration (of N=500 total):
+1. **Events:** check and execute scheduled exogenous events
+2. **Capture:** `SimulatorInfo.capture()` records market and agent state
+3. **Behavioral update:** Universalists switch strategy, Chartists switch sentiment
+4. **Trading:** shuffle all traders, call each agent's `call()` method
+5. **Payments:** dividend income (`cash += assets * dividend`) and risk-free interest (`cash += cash * rf`)
+6. **Dividend generation:** advance the dividend book
+
+### 5. Events System
+
+Seven event types, each activated at a pre-specified iteration:
+- `MarketPriceShock(it, dp)`: shifts all order prices in book by dp
+- `FundamentalPriceShock(it, dp)`: adjusts dividend book by dp * rf
+- `LiquidityShock(it, dv)`: one-sided market order removing depth
+- `InformationShock(it, access)`: changes Fundamentalist/Universalist access parameter
+- `MarketMakerIn(it, cash, assets, softlimit)`: adds MarketMaker mid-simulation
+- `MarketMakerOut(it)`: removes all MarketMakers
+- `TransactionCost(it, cost)`: changes exchange transaction cost
+
+### 6. SimulatorInfo (Data Recording)
+
+**Per-iteration time series:**
+- Market: `prices`, `spreads`, `dividends`, `orders` (book depth)
+- Per-agent: `equities`, `cash`, `assets`, `types`, `sentiments`, `returns`
+
+**Derived indicators:**
+- `stock_returns(roll)`: (p[t+1]-p[t])/p[t] + div[t]/p[t]
+- `abnormal_returns(roll)`: returns minus rf
+- `return_volatility(window)`: rolling std dev of returns
+- `price_volatility(window)`: rolling std dev of prices
+- `liquidity(roll)`: (ask-bid)/price
+- `fundamental_value(access)`: theoretical fundamental price
+
+### 7. Market State Classification (`states.py`)
+
+- `aggToShock(sim, window, funcs)`: aggregates stats relative to shock timing
+- `general_states(info, size, window)`: classifies periods as 'stable', 'trend', 'panic', 'disaster', 'mean-rev'
+  - **WARNING:** This function is unreliable — it classifies ~80% of normal operation as 'panic'/'disaster'. Direct metrics (vol_ratio, etc.) should be used instead.
+
+### 8. Visualization (`visualization/`)
+
+- `market.py`: plot_price, plot_price_fundamental, plot_arbitrage, plot_dividend, plot_orders, plot_volatility_price, plot_volatility_return, plot_liquidity
+- `trader.py`: plot_equity, plot_cash, plot_assets, plot_strategies, plot_sentiments, plot_returns
+- `other.py`: plot_book, print_book
+
+---
+
+## Author's Modifications
+
+### Modification 1: Speed Attribute and Two-Phase Activation
+
+**File:** `simulator/simulator.py` → `Simulator.simulate()`
+
+Replaced the single `random.shuffle(self.traders)` + sequential call with a two-phase loop:
+
+```python
+fast = [t for t in self.traders if getattr(t, 'speed', 'slow') == 'fast']
+slow = [t for t in self.traders if getattr(t, 'speed', 'slow') != 'fast']
+
+random.shuffle(fast)
+for t in fast:
+    t.call()
+
+# Optional extra call for fast agents (used in some versions):
+if fast_extra_call:
+    random.shuffle(fast)
+    for t in fast:
+        t.call()
+
+random.shuffle(slow)
+for t in slow:
+    t.call()
+```
+
+Agents are tagged with `trader.speed = 'fast'` or `'slow'` when created in experiment files.
+
+### Modification 2: MarketMaker Panic Tracking
+
+**File:** `simulator/simulator.py` → `SimulatorInfo`
+
+Added `self.mm_panic = []` to `__init__`. In `capture()`:
+```python
+self.mm_panic.append({
+    t_id: getattr(t, 'panic', None)
+    for t_id, t in self.traders.items()
+    if type(t) == MarketMaker
+})
+```
+
+New method:
+```python
+def mm_panic_ratio(self, from_it=0) -> float:
+    subset = self.mm_panic[from_it:]
+    if not subset:
+        return 0.0
+    return sum(1 for snap in subset if any(snap.values())) / len(subset)
+```
+
+### Modification 3: TrendChartist (Corrected Sentiment Logic)
+
+**File:** `experiment_h1_v9.py` (defined inline in the experiment file)
+
+The original `Chartist.change_sentiment()` has **inverted exp() signs** producing contrarian behavior. `TrendChartist` fixes this to produce trend-following behavior:
+
+```python
+class TrendChartist(Chartist):
+    def change_sentiment(self, info, a1=1, a2=1, v1=0.1):
+        # ... compute U = a1*x + a2/v1 * dp/p ...
+        if self.sentiment == 'Optimistic':
+            prob = v1 * n_chartists / n_traders * exp(-U)  # FIXED: exp(-U) not exp(U)
+            # When price falls (dp<0): U<0, exp(-U) large -> flip to Pessimistic -> SELL
+            if prob > random.random():
+                self.sentiment = 'Pessimistic'
+        elif self.sentiment == 'Pessimistic':
+            prob = v1 * n_chartists / n_traders * exp(U)   # FIXED: exp(U) not exp(-U)
+            # When price rises (dp>0): U>0, exp(U) large -> flip to Optimistic -> BUY
+            if prob > random.random():
+                self.sentiment = 'Optimistic'
+```
+
+**Why this matters:** With the original contrarian Chartist, fast agents STABILIZE the market after a shock (they buy the dip faster). H1 cannot be confirmed with contrarian agents — it's not that the hypothesis is wrong, it's that the agent behavior doesn't match real HFT (which is trend-following per Kirilenko 2017, Zhou 2022).
+
+### Modification 4: SlowTrendChartist (Information Latency)
+
+**File:** `experiment_h1_v9.py`
+
+Same as TrendChartist but reads price change from `lag` iterations ago:
+
+```python
+class SlowTrendChartist(TrendChartist):
+    def __init__(self, market, cash, assets=0, lag=3):
+        super().__init__(market, cash, assets)
+        self.lag = lag
+
+    def change_sentiment(self, info, a1=1, a2=1, v1=0.1):
+        if self.lag == 0 or len(info.prices) <= self.lag + 1:
+            dp = info.prices[-1] - info.prices[-2]
+        else:
+            dp = info.prices[-1 - self.lag] - info.prices[-2 - self.lag]
+        # ... same corrected sign convention as TrendChartist ...
+```
+
+This creates a two-wave crash mechanism: fast agents react immediately, slow agents react `lag` iterations later.
+
+### Modification 5: Front-Running Simulator (simulator_hft.py)
+
+**File:** `simulator_hft.py` (NEW file, used only in experiment_h1_v8.py)
+
+Implements `InterceptingExchange` that wraps `ExchangeAgent`:
+- When `intercepting=True`: slow traders' orders are buffered in `pending_orders` instead of executing
+- Fast traders execute normally against the real book
+- Then slow traders' pending orders are flushed (executing at shifted prices)
+
+This simulates real front-running where HFTs see and act on slow traders' order flow before it reaches the book.
+
+---
+
+## The Sentiment Bug — Full Diagnosis
+
+This was the central discovery of the research. Versions 1-8 all failed to confirm H1 because of a sign error in the original `Chartist.change_sentiment()`:
+
+**Original behavior (contrarian):**
+```
+Price falls (dp < 0) → U < 0 → exp(-U) >> 1 → Pessimists flip to Optimistic → BUY → stabilize
+Price rises (dp > 0) → U > 0 → exp(U) >> 1 → Optimists flip to Pessimistic → SELL → stabilize
+```
+
+**Consequence for H1:** Fast contrarian chartists REDUCE volatility after a shock — the exact opposite of what H1 predicts. More HFT = faster stabilization = lower vol_ratio. This is exactly what v1-v8 showed: decreasing vol_ratio with increasing phi.
+
+**Fixed behavior (trend-following):**
+```
+Price falls (dp < 0) → U < 0 → exp(-U) >> 1 → Optimists flip to Pessimistic → SELL → amplify
+Price rises (dp > 0) → U > 0 → exp(U) >> 1 → Pessimists flip to Optimistic → BUY → amplify
+```
+
+**Note:** This is NOT a bug in the original simulator per se — the original code may have been designed for contrarian chartists. But for modeling HFT behavior, trend-following is correct (per the literature).
+
+---
+
+## H1 Experimental Progression (9 Versions)
+
+### v1: Baseline Speed Experiment
+- **Setup:** 10 Fundamentalists + 10 Chartists + 1 MM, 500 iter, 20 runs
+- **Speed:** Random agents tagged fast/slow, fast_share varies 0.0-1.0
+- **Metric:** `crisis_share` from `general_states()`
+- **Result:** No signal. `crisis_share` unreliable (80% baseline flagged as crisis).
+
+### v2: Shock Magnitude Sweep + Information Asymmetry
+- **Change:** Grid over shock magnitude dp ∈ {-1,-2,-3,-5,-7,-10} and fast_share. Fast Fundamentalists get access=5, slow get access=1.
+- **Total:** 180 simulations
+- **Result:** No signal. Speed and information effects confounded.
+
+### v3: New Direct Metrics
+- **Change:** Replaced broken `general_states()` with five direct metrics:
+  - `vol_ratio` = mean post-shock volatility / mean pre-shock volatility (window=10)
+  - `spread_ratio` = mean relative spread after / before
+  - `max_drawdown` = (pre_price - min_post_price) / pre_price
+  - `recovery_time` = iterations until price within 2% of pre-shock level
+  - `mm_panic_ratio` = fraction of post-shock iterations with MM in panic
+- **Result:** vol_ratio DECREASING with phi (inverse of H1). Later traced to contrarian sentiment.
+
+### v4: Increased Statistical Power
+- **Change:** n_runs 10 → 30 (330 total)
+- **Result:** Same inverse trend, now confirmed as robust (not noise).
+
+### v5: Pure Speed Effect Isolation
+- **Change:** access=1 for ALL agents. Removes information asymmetry entirely.
+- **Result:** Same inverse effect. Pure execution speed with contrarian agents = stabilization.
+
+### v6: MarketMaker Softlimit Grid
+- **Change:** 2D grid: fast_share × softlimit ∈ {5,10,20,50,100}, 20 runs
+- **Total:** 1,100 simulations
+- **Result:** mm_panic depends on softlimit only, not on fast_share. No H1 effect at any softlimit.
+
+### v7: Delayed Price Observation (BUGGY)
+- **Change:** Declared `delayed_price_lag` parameter but NEVER PASSED it to the simulator.
+- **Result:** Functionally identical to v6. Bug discovered later.
+
+### v8: Front-Running via InterceptingExchange
+- **Change:** Uses `simulator_hft.py` with `front_running=True`. Slow orders intercepted.
+- **Result:** Front-running intensifies the stabilizing effect — fast contrarian agents stabilize even more efficiently.
+
+### v9: TrendChartist + Information Latency — H1 CONFIRMED
+- **Changes:**
+  - TrendChartist (corrected exp signs for trend-following)
+  - SlowTrendChartist (lagged price observation)
+  - Grid: phi ∈ {0.0, 0.1, ..., 1.0} × lag ∈ {0, 1, 3, 5, 10} × 30 runs = 1,650 simulations
+  - Removed fast_extra_call (pure execution priority only)
+- **Results:**
+  - **lag=0:** vol_ratio rises from 1.795 (phi=0) to 2.498 (phi=1), +39%
+  - **Tipping point at phi* = 0.4:** vol_ratio = 2.406, first crossing 1.3 × baseline (1.795 × 1.3 = 2.334)
+  - Spread ratio +22%, recovery time +70% at phi=1 vs phi=0
+  - **lag >= 3:** baseline volatility already elevated (2.33-2.52), HFT effect masked by information delay noise
+  - Information delays are themselves an independent source of instability
+
+---
+
+## Stability Metrics — Definitions and Interpretation
+
+### vol_ratio (PRIMARY METRIC)
+```python
+def vol_ratio(info, shock_it=200, window=10):
+    vols = info.price_volatility(window=window)
+    pre = vols[:shock_it - window]
+    post = vols[shock_it:]
+    return mean(post) / (mean(pre) + 1e-9)
+```
+- 1.0 = no change from shock
+- 1.8 = volatility 80% higher after shock
+- Used to determine tipping point
+
+### spread_ratio
+```python
+def spread_ratio(info, shock_it=200):
+    def rel(spreads, prices):
+        vals = [(s['ask'] - s['bid']) / p for s, p in zip(spreads, prices) if s and p]
+        return mean(vals) if vals else 1e-9
+    pre = rel(info.spreads[:shock_it], info.prices[:shock_it])
+    post = rel(info.spreads[shock_it:], info.prices[shock_it:])
+    return post / (pre + 1e-9)
+```
+- 1.0 = liquidity unchanged
+- 2.0 = spread doubled after shock
+
+### max_drawdown
+```python
+def max_drawdown(info, shock_it=200):
+    pre_price = info.prices[shock_it - 1]
+    post = info.prices[shock_it:]
+    return (pre_price - min(post)) / pre_price
+```
+- 0.10 = 10% max decline
+- 0.20 = 20% max decline
+
+### recovery_time
+```python
+def recovery_time(info, shock_it=200, threshold=0.02):
+    pre_price = info.prices[shock_it - 1]
+    for i, p in enumerate(info.prices[shock_it:]):
+        if abs(p - pre_price) / pre_price < threshold:
+            return i
+    return len(info.prices) - shock_it
+```
+- Iterations until price within 2% of pre-shock level
+
+### mm_panic_ratio
+```python
+def mm_panic_ratio(info_obj, shock_it=200):
+    # from SimulatorInfo.mm_panic_ratio(from_it=shock_it)
+```
+- Fraction of post-shock iterations where any MM has panic=True
+
+### Tipping Point Detection
+```python
+def find_tipping_point(agg, lag, col, multiplier=1.3):
+    sub = agg[agg['lag'] == lag].sort_values('hft_frac')
+    baseline = sub.loc[sub['hft_frac'] == 0.0, col].values[0]
+    for _, row in sub.iterrows():
+        if row['hft_frac'] == 0.0:
+            continue
+        if row[col] >= baseline * multiplier:
+            return row['hft_frac']
+    return None
+```
+
+---
+
+## Key Results Table (v9, lag=0)
+
+| phi | vol_ratio | spread_ratio | max_drawdown | recovery_time | mm_panic |
+|:---:|:---------:|:------------:|:------------:|:-------------:|:--------:|
+| 0.0 | 1.795     | 1.923        | 0.154        | 35.8          | 0.986    |
+| 0.2 | 2.161     | 2.231        | 0.157        | 35.8          | 0.925    |
+| **0.4** | **2.406** | **2.750** | **0.163**   | **46.8**      | **0.926** |
+| 0.6 | 2.464     | 2.695        | 0.147        | 39.8          | 0.927    |
+| 0.8 | 1.862     | 2.048        | 0.138        | 18.2          | 0.942    |
+| 1.0 | 2.498     | 2.345        | 0.161        | 60.7          | 0.911    |
+
+**Tipping point: phi* = 0.4** (vol_ratio crosses 1.3 × 1.795 = 2.334)
+
+### Cross-Lag Comparison
+
+| lag | baseline vol (phi=0) | vol at phi=1 | change | tipping point |
+|:---:|:-------------------:|:------------:|:------:|:-------------:|
+| 0   | 1.795               | 2.498        | +39%   | phi = 0.4     |
+| 1   | 1.853               | 2.350        | +27%   | —             |
+| 3   | 2.330               | 2.415        | +4%    | —             |
+| 5   | 2.356               | 2.510        | +7%    | —             |
+| 10  | 2.520               | 2.448        | -3%    | —             |
+
+---
+
+## Standard Experimental Configuration
+
+All H1 experiments share these defaults:
+- Initial price: p0 = 100
+- Order book depth: V = 1000
+- Risk-free rate: rf = 5e-4 per iteration
+- Population: 10 Fundamentalists + 10 Chartists + 1 MarketMaker
+- Horizon: N = 500 iterations
+- Shock: `MarketPriceShock(it=200, dp=-10)`
+- Runs per parameter combination: 30 (for statistical power)
+
+Experiment-specific parameters:
+- `hft_frac` (phi): share of chartists that are fast TrendChartists (0.0 to 1.0 in 0.1 steps)
+- `lag`: information delay for SlowTrendChartists (0, 1, 3, 5, 10 iterations)
+- `softlimit`: MarketMaker inventory limit (default 100, varied in v6)
+- `fast_extra_call`: whether fast agents get an extra trading call per iteration (used in early versions, removed in v9)
+
+---
+
+## Implemented: Unified Experiment (`experiment_unified.py`)
+
+### Modification 6: `speed_multiplier` parameter
+
+**File:** `simulator/simulator.py` → `Simulator.simulate()`
+
+Fast agents now trade `speed_multiplier` times per iteration instead of once:
+
+```python
+def simulate(self, n_iter, silent=False, fast_extra_call=False, speed_multiplier=1):
+    ...
+    for _ in range(speed_multiplier):
+        random.shuffle(fast)
+        for trader in fast:
+            trader.call()
+    ...
+```
+
+### Modification 7: Delayed order book information
+
+**File:** `agents/agents.py`
+
+`ExchangeAgent` now stores a sliding window of 20 historical spread/price snapshots:
+- `record_state()`: called each iteration before trading, snapshots current spread and price
+- `delayed_spread(lag)`: returns spread from `lag` iterations ago
+- `delayed_price(lag)`: returns price from `lag` iterations ago
+
+`Trader` base class now has `info_lag` parameter (default 0) and methods:
+- `_get_spread()`: returns delayed spread if `info_lag > 0`, else real-time
+- `_get_price()`: returns delayed price if `info_lag > 0`, else real-time
+
+`Chartist.call()` and `Fundamentalist.call()` use `_get_spread()` / `_get_price()` instead of direct calls.
+
+All agent constructors accept `info_lag=0` and pass it through to `Trader.__init__`. Backward compatible.
+
+### Modification 8: Empty order book protection
+
+At high `speed_multiplier` (≥2), fast agents can exhaust the order book entirely. Added `try/except` and `None` checks throughout the codebase. Also added `U = max(-50, min(50, U))` clamping in TrendChartist/SlowTrendChartist to prevent `OverflowError` from `exp()`.
+
+### Three experimental grids
+
+- **Grid 1 (Speed):** speed_multiplier ∈ {1,2,3,5} × hft_frac ∈ {0.0–1.0} × 30 runs = 1,320 simulations
+- **Grid 2 (Delay):** info_lag ∈ {0,1,3,5,10} × hft_frac ∈ {0.0–1.0} × 30 runs = 1,650 simulations
+- **Grid 3 (Combined):** speed_multiplier ∈ {2,3} × info_lag ∈ {1,3,5} × hft_frac step 0.2 × 30 runs = 1,056 simulations
+- **Total: 4,026 simulations**
+
+### Statistical methods
+
+- **Mann-Whitney U test** (non-parametric): pairwise comparison of vol_ratio at φ=0 vs each φ, one-sided, p < 0.05
+- **Bootstrap 95% CI** (1000 resamples): used on metric plots
+- **Sensitivity analysis**: tipping point at thresholds 1.1×–1.5×
+
+### Output files
+
+| File | Contents |
+|------|----------|
+| `unified_speed_raw.csv` | Grid 1 raw results (1,320 rows) |
+| `unified_delay_raw.csv` | Grid 2 raw results (1,650 rows) |
+| `unified_combined_raw.csv` | Grid 3 raw results (1,056 rows) |
+| `unified_speed.png` | Grid 1 metrics + sensitivity table |
+| `unified_delay.png` | Grid 2 metrics + heatmap |
+| `unified_stats.png` | Mann-Whitney bar plots + sensitivity table |
+
+---
+
+## Unified Experiment Results
+
+### Main result: strongest support at moderate speed advantage
+
+| speed_mult | baseline vol (φ=0) | max vol | tipping (1.3×) | p-value at tipping |
+|:---:|:---:|:---:|:---:|:---:|
+| 1 | 2.123 | 3.264 (φ=0.6) | φ=0.6 | p=0.033 * |
+| **2** | **1.746** | **3.392 (φ=0.4)** | **φ=0.2** | **p=0.002 **** |
+| 3 | 2.051 | 3.401 (φ=0.9) | φ=0.3 | p=0.034 * |
+| 5 | 2.467 | 2.746 (φ=0.1) | — | n.s. |
+
+**Interpretation:** the unified experiment does **not** support a monotone "more speed = more instability" claim. The strongest and cleanest H1 support appears at **moderate speed advantage**, especially `speed×2`. `speed×3` remains supportive but noisier. `speed×5` breaks the original tipping pattern.
+
+### Mann-Whitney U results (speed×2)
+
+| φ | baseline | treatment | U | p-value | sig |
+|:---:|:---:|:---:|:---:|:---:|:---:|
+| 0.1 | 1.746 | 2.224 | 316 | 0.024 | * |
+| 0.2 | 1.746 | 2.541 | 256 | 0.002 | ** |
+| 0.4 | 1.746 | 3.392 | 162 | <0.0001 | *** |
+| 0.5 | 1.746 | 3.142 | 223 | 0.0004 | *** |
+| 0.6 | 1.746 | 2.970 | 275 | 0.005 | ** |
+| 1.0 | 1.746 | 2.933 | 253 | 0.002 | ** |
+
+### Sensitivity analysis (speed×2)
+
+| Threshold | Tipping point φ* |
+|:---:|:---:|
+| 1.1× | 0.1 |
+| 1.2× | 0.1 |
+| 1.3× | 0.2 |
+| 1.4× | 0.2 |
+| 1.5× | 0.4 |
+
+### Combined Grid (Grid 3) — regime-dependent result
+
+The combined experiment answers the supervisor's specific question: **is there a regime where information delay and speed multiplier are present simultaneously?** Yes — this is Grid 3.
+
+Representative Grid 3 results:
+
+| speed_mult | lag | baseline vol (φ=0) | tipping (1.3×) | interpretation |
+|:---:|:---:|:---:|:---:|:---|
+| 2 | 1 | 2.347 | φ = 1.0 | effect exists, but only at the extreme HFT share |
+| 2 | 3 | 2.596 | φ = 1.0 | same pattern; delay already raises baseline instability |
+| 2 | 5 | 2.340 | φ = 0.4 | clear tipping point in combined regime |
+| 3 | 1 | 2.178 | φ = 0.2 | strongest combined-regime result |
+| 3 | 3 | 2.141 | φ = 0.4 | combined effect persists, but threshold shifts |
+| 3 | 5 | 2.700 | — | no tipping point under the 30% rule |
+
+**Interpretation:** Grid 3 is informative, but heterogeneous. It should be presented as a **robustness / interaction experiment**, not as the single cleanest proof. Its main value is showing that the speed effect can survive in the presence of delay, but only in part of the parameter space.
+
+### Five conclusions
+
+1. **Strongest H1 support at speed×2.** This is the cleanest tipping-point regime in the unified experiment.
+2. **Tipping point at φ*=0.2 (speed×2, 1.3×).** Robust across thresholds (φ=0.1–0.4).
+3. **Non-monotonic effect of speed.** At speed×5 the original tipping pattern collapses; the most plausible interpretation is aggressive liquidity depletion / partial order-book exhaustion rather than improved market health.
+4. **Information delay is an independent instability source.** Baseline vol_ratio rises as lag increases, even at φ=0.
+5. **Combined regimes are conditional, not universal.** Speed + delay can generate tipping points, but their location depends on the exact microstructure regime.
+
+---
+
+## Post-Unified Follow-Up Work (current workspace)
+
+After `experiment_unified.py` was completed, several follow-up scripts and presentation materials were added to strengthen interpretation and defense.
+
+### Follow-up 1: Threshold validation (`experiment_threshold_validation.py`)
+
+Purpose:
+- justify the use of the `1.3× baseline` rule as the main working tipping-point threshold,
+- without rerunning the full simulation,
+- by reusing `unified_all_raw.csv`.
+
+Method:
+- choose several representative regimes,
+- recompute tipping point `φ*` under thresholds `1.1×, 1.2×, 1.3×, 1.4×, 1.5×`,
+- compare how stable the estimated tipping region remains.
+
+Representative regimes used:
+- `speed_x2` — cleanest speed-only regime
+- `combined_speed_x3_lag1` — strong combined regime
+- `combined_speed_x3_lag5` — combined regime where 1.3× tipping disappears
+
+Main result:
+
+| Regime | 1.1× | 1.2× | 1.3× | 1.4× | 1.5× |
+|---|---:|---:|---:|---:|---:|
+| `speed_x2` | 0.1 | 0.1 | 0.2 | 0.2 | 0.4 |
+| `combined_speed_x3_lag1` | 0.2 | 0.2 | 0.2 | 0.2 | 0.6 |
+| `combined_speed_x3_lag5` | 0.6 | 0.6 | — | — | — |
+
+Interpretation:
+- `1.1×` and `1.2×` are too soft: crossings often happen very early
+- `1.5×` is too strict: meaningful regimes can lose tipping points entirely
+- `1.3×` is **not mathematically unique**, but is a reasonable **common working threshold**
+
+Output files:
+- `threshold_validation_summary.csv`
+- `threshold_validation.png`
+- `threshold_validation_heatmap.png`
+- `threshold_validation_report.md`
+
+### Follow-up 2: Targeted Grid 3 rerun (`experiment_grid3_rerun.py`)
+
+Purpose:
+- recompute only the combined grid,
+- save results separately from the original unified experiment,
+- support resume / incremental saving / skip logging.
+
+Motivation:
+- Grid 3 is the most computationally expensive block
+- the original combined grid used timeout-based skipping
+- the rerun script was created to re-check the combined regime without touching Grid 1 or Grid 2
+
+Key design features:
+- outputs saved separately:
+  - `grid3_rerun_raw.csv`
+  - `grid3_rerun_skips.csv`
+  - `grid3_rerun_agg.csv`
+  - `grid3_rerun.png`
+- supports command-line restriction to specific `speed_mult`, `lag`, `phi` subsets
+- supports resume from partially completed reruns
+
+Current status:
+- this rerun is intended as a **targeted verification tool**, not as a replacement for the already computed unified experiment
+
+### Follow-up 3: Additional Mann-Whitney analyses (`experiment_speed_delay_mannwhitney.py`)
+
+Purpose:
+- extend the original Mann-Whitney logic beyond "baseline φ=0 vs each φ"
+- separately test:
+  1. **effect of speed at fixed φ**
+  2. **effect of delay at fixed φ**
+
+This answers two additional questions:
+- Does increasing `speed_multiplier` shift the `vol_ratio` distribution upward at a fixed HFT share?
+- Does increasing `info_lag` shift the `vol_ratio` distribution upward at a fixed HFT share?
+
+Outputs:
+- `speed_effect_mannwhitney.csv`
+- `delay_effect_mannwhitney.csv`
+- `speed_effect_mannwhitney.png`
+- `delay_effect_mannwhitney.png`
+- `speed_delay_effect_mannwhitney_report.md`
+
+### Follow-up 4: Presentation notebook (`/Users/arinaravilova/Desktop/unified_experiment_talk.ipynb`)
+
+Purpose:
+- convert raw results into a supervisor-facing discussion notebook
+- provide:
+  - one section per grid
+  - graphical interpretation
+  - explanation of threshold choice
+  - explanation of Mann-Whitney U test
+  - a compact oral script for live discussion
+
+This notebook is a presentation artifact, not part of the simulation pipeline.
+
+### Technical fix: plotting bug in `experiment_unified.py`
+
+During plotting, a `KeyError: 'drawdown'` was discovered.
+
+Cause:
+- aggregated columns used names like `drawdown_mean`
+- raw CSV stores the underlying column as `max_drawdown`
+
+Fix:
+- plotting code now uses an explicit raw metric map:
+  - `drawdown_mean -> max_drawdown`
+  - `recovery_mean -> recovery_time`
+  - `mm_panic_mean -> mm_panic_ratio`
+
+Interpretation:
+- the original unified experiment results were already computed correctly
+- the error affected only the plotting stage, not the simulation results themselves
+
+---
+
+## Planned but Not Yet Implemented
+
+### H2: Event Time (Volume Clock)
+- Replace fixed-iteration loop with volume-clock loop
+- Compare tipping point under calendar time vs. event time
+
+### H3: Volatility Clustering
+- Add `reaction_delay` parameter; factorial grid: delay × softlimit
+- Measure autocorrelation of |returns|
+
+---
+
+## Important Conventions and Pitfalls
+
+1. **Agent classes defined in experiment files, not in agents.py.** TrendChartist and SlowTrendChartist are defined inline in `experiment_h1_v9.py`, not in the core `agents/agents.py`. This was a deliberate choice to avoid modifying the original codebase.
+
+2. **`general_states()` is unreliable.** It classifies ~80% of baseline (no-shock) time as 'panic'/'disaster'. Always use direct metrics (vol_ratio, spread_ratio, etc.) instead.
+
+3. **The original Chartist is CONTRARIAN.** This is by design in the original code (bognik002). For HFT modeling, use TrendChartist (corrected signs). Do not "fix" the original Chartist — it may be needed for other experiments.
+
+4. **MarketMaker panic flag is diagnostic only.** The panic-triggered rebalancing logic in the original code never fires because it checks for `None` instead of zero.
+
+5. **experiment_h1_v7.py has a bug** — the `delayed_price_lag` parameter is declared but never passed to the simulator. It's functionally identical to v6.
+
+6. **simulator_hft.py is separate from simulator.py.** It has its own Simulator class with front-running logic. Only used in experiment_h1_v8.py.
+
+7. **All experiment files are standalone scripts.** Each experiment_h1_v*.py file contains its own population setup, grid, run loop, metrics, and plotting. They import from AgentBasedModel but are self-contained.
+
+8. **The speed attribute is ad-hoc.** It's set via `trader.speed = 'fast'` after construction, not as a constructor parameter. The simulator checks it with `getattr(t, 'speed', 'slow')`.
+
+9. **CSV column names vary between versions.** v1-v2 use `fast_share`, v3+ use `hft_frac`. Some versions have `dp` (shock magnitude), `softlimit`, `lag` columns depending on the grid.
+
+10. **Plots have been translated to English** in the latest commits on both experiment branches. Earlier commits have Russian plot labels.
+
+---
+
+## How to Run
+
+```python
+# Basic simulation (original baseline)
+from AgentBasedModel import *
+exchange = ExchangeAgent(volume=1000)
+traders = [
+    *[Random(exchange, 10**3) for _ in range(5)],
+    *[Fundamentalist(exchange, 10**3) for _ in range(10)],
+    *[Chartist(exchange, 10**3) for _ in range(10)],
+    MarketMaker(exchange, 10**3, softlimit=100)
+]
+sim = Simulator(exchange=exchange, traders=traders, events=[MarketPriceShock(200, -10)])
+sim.simulate(500)
+plot_price(sim.info)
+
+# H1 experiment v9 (latest)
+python experiment_h1_v9.py  # Runs full grid, outputs h1_v9_raw.csv and plots
+```
+
+---
+
+## References (from the paper)
+
+[1] Easley, López de Prado, O'Hara (2011) — Flow Toxicity and Flash Crash
+[2] Easley, López de Prado, O'Hara (2012) — Flow Toxicity in HF World
+[3] Easley, López de Prado, O'Hara (2012) — Volume Clock
+[4] Johnson et al. (2013) — Machine ecology beyond human response time
+[5] Kirilenko et al. (2017) — Flash Crash: HFT in Electronic Markets
+[6] Bookstaber & Paddrik (2015) — ABM for Crisis Liquidity Dynamics
+[7] Wah & Wellman (2016) — Latency Arbitrage in Fragmented Markets
+[8] Zhou, Zhong, Li (2022) — Stability driven by information delay and liquidity
+[9] Brunnermeier & Pedersen (2005) — Predatory Trading
+[10] Carlin, Lobo, Viswanathan (2007) — Episodic Liquidity Crises
+[11] Budish, Cramton, Shim (2015) — Frequent Batch Auctions
+[12] Biais, Foucault, Moinas (2015) — Equilibrium Fast Trading
+[13] Menkveld & Zoican (2017) — Exchange Latency and Liquidity
+[14] Kirman & Teyssière (2002) — Bubbles and Crashes ABM
+[15] IOSCO (2011) — Market Integrity and Technological Changes
+[16] CFTC & SEC (2010) — Findings on May 6, 2010 Market Events
