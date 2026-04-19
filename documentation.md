@@ -1,4 +1,4 @@
-# 1D-ABM Project Documentation
+# 1D-ABM H1 Experiment Documentation
 
 ## Project Overview
 
@@ -26,7 +26,7 @@ This repository contains an **agent-based financial market simulator** with:
 - exogenous market shocks,
 - experiment scripts studying how speed and information delay affect market stability.
 
-The author's research focus is **H1**: whether heterogeneous information / execution speed creates a tipping point in post-shock instability.
+This document is the H1-focused workspace documentation. Its research focus is whether heterogeneous information / execution speed creates a tipping point in post-shock instability.
 
 ### Three layers of the codebase
 
@@ -64,7 +64,6 @@ If you need the **post-unified follow-up analyses**, use:
 - `experiment_speed_delay_mannwhitney.py`
 - `experiment_noisy_delay.py`
 - `experiment_shock_magnitude.py`
-- `experiment_h2_event_time.py`
 
 If you need the **presentation / defense artifact**, use:
 - `/Users/arinaravilova/Desktop/unified_experiment_talk.ipynb`
@@ -127,7 +126,7 @@ If you need the **presentation / defense artifact**, use:
 
 ---
 
-## Three Hypotheses
+## H1 Hypothesis
 
 ### H1: Latency Heterogeneity and the Tipping Point (IMPLEMENTED & TESTED)
 An increase in the proportion of high-frequency traders with execution-speed advantage can lead to higher post-shock market volatility and reduced liquidity, exhibiting a non-linear transition beyond a critical threshold `phi*`.
@@ -141,16 +140,6 @@ The correct interpretation is not "more speed always means more instability." In
 - information delay raises baseline instability,
 - combined speed+delay effects are regime-dependent,
 - extreme `speed×5` produces non-monotonic dynamics and should not be treated as stronger confirmation of H1.
-
-### H2: Calendar Time versus Event Time (DESIGNED, NOT YET IMPLEMENTED)
-Updating information in event time (volume clock) as opposed to real calendar time can alter market resilience and shift the boundary at which crises occur. Markets operating on an event-time basis should be more robust, effectively raising the tipping-point threshold.
-
-**Design:** Replace the fixed-iteration loop with a volume-clock loop where one "tick" = reaching a cumulative executed volume threshold V*. Rescale dividend/interest payments per tick.
-
-### H3: Information Delay, Liquidity Constraints, and Volatility Clustering (DESIGNED, NOT YET IMPLEMENTED)
-Combining information delays with liquidity constraints produces volatility clustering, which becomes more severe during crisis regimes. The interaction effect should be superadditive.
-
-**Design:** Introduce `reaction_delay` parameter controlling how often slow agents participate. Factorial grid: delay x softlimit. Measure autocorrelation of absolute returns.
 
 ---
 
@@ -217,7 +206,6 @@ cb3937d translate plots
 ├── experiment_speed_delay_mannwhitney.py  # Follow-up: Mann-Whitney tests for speed/delay effects at fixed phi
 ├── experiment_noisy_delay.py        # Follow-up: information delay only for noisy Random agents
 ├── experiment_shock_magnitude.py    # Follow-up: robustness of phi* across shock magnitudes
-├── experiment_h2_event_time.py      # H2: calendar time versus event-time / volume-clock market design
 │
 ├── h1_description.md                # Detailed description of all H1 experiments (Russian)
 ├── h1_v9_raw.csv                    # Raw results: 1650 simulations
@@ -1278,180 +1266,6 @@ The correct conclusion is:
 
 > The HFT-related tipping effect is robust across the tested shock magnitudes, but the exact value of `phi*` is shock-size-dependent. The tipping point should be interpreted as a regime-dependent threshold rather than a fixed structural constant.
 
-### H2 Experiment: Calendar time versus event time (`experiment_h2_event_time.py`)
-
-This experiment implements the second hypothesis: changing the market's timekeeping mechanism from calendar time to event time can improve resilience and shift the crisis boundary.
-
-#### Research idea
-
-The H1 experiments ask:
-
-> At what share of fast HFT-type chartists does the market become unstable?
-
-H2 asks a market-design question:
-
-> If the market updates information in event time rather than calendar time, does the market tolerate a higher HFT share before tipping?
-
-Calendar time is the baseline simulator logic:
-- one tick = one fixed simulation iteration,
-- agents are activated once per tick,
-- fast agents act first and may act `speed_multiplier` times,
-- state capture, sentiment update, payments, and dividend generation happen once per tick.
-
-Event time replaces the fixed iteration clock with a volume clock:
-- one event tick = enough trading has occurred to reach cumulative executed volume `V*`,
-- inside one event tick, the simulator may run multiple activation batches,
-- state capture, sentiment update, payments, and dividend generation happen once per event tick,
-- agents therefore update information after comparable traded volume, not after arbitrary calendar intervals.
-
-The key comparison is:
-
-```text
-Delta phi* = phi*_event - phi*_calendar
-```
-
-H2 is supported if:
-- `Delta phi* > 0`, meaning event time shifts the tipping point to a higher HFT share,
-- and event time also lowers crisis severity indicators such as `vol_ratio`, `spread_ratio`, drawdown, or recovery time.
-
-#### Clean experimental design
-
-The first H2 experiment should be intentionally narrow:
-- no information delay,
-- no noisy-only delay,
-- no shock-magnitude sweep,
-- same population and H1 metrics as the clean speed experiment,
-- only the clock mechanism changes.
-
-Fixed parameters:
-- `info_lag = 0`,
-- `speed_multiplier = 2`,
-- `shock_dp = -10`,
-- `n_ticks = 500`,
-- `shock_tick = 200`,
-- `n_runs = 30`,
-- `hft_frac ∈ {0.0, 0.1, ..., 1.0}`.
-
-Experimental modes:
-- `calendar`: one tick is one ordinary simulator iteration,
-- `event`: one tick ends when executed volume reaches `V*`.
-
-Default volume-clock threshold:
-- `Vstar = 50`.
-
-`Vstar` is exposed as a command-line parameter because it is a calibration choice. If diagnostics show that event ticks are too short or too long, the experiment can be rerun with a different threshold.
-
-Total default grid:
-- `2 modes × 11 phi values × 30 runs = 660` simulations.
-
-#### Volume tracking architecture
-
-The experiment should not modify the core `AgentBasedModel` package. Instead, `experiment_h2_event_time.py` defines local tracking classes:
-- `TrackedOrderList(OrderList)`,
-- `EventExchangeAgent(ExchangeAgent)`.
-
-`TrackedOrderList.fulfill()` mirrors the original matching logic but increments counters whenever a trade is executed:
-
-```python
-self.exchange.event_volume += tmp_qty
-self.exchange.total_traded_volume += tmp_qty
-```
-
-This makes the event-time clock depend on actual matched quantity, not on submitted orders.
-
-The core limit-order-book behavior remains the same:
-- same price-time ordering,
-- same matching conditions,
-- same cash/asset transfers,
-- same order insertion and cancellation behavior.
-
-#### Calendar mode
-
-Calendar mode is the H2 baseline. For each tick:
-- apply scheduled shock if `tick == shock_tick`,
-- reset per-tick volume counter,
-- record delayed-information state,
-- capture market/agent state,
-- update chartist sentiment,
-- activate fast agents first,
-- activate slow agents after,
-- record executed volume diagnostics,
-- apply payments once,
-- generate dividend once.
-
-This mode should reproduce the clean H1-style calendar-time dynamics, while adding volume diagnostics.
-
-#### Event-time mode
-
-Event mode uses the same population and trading rules, but changes the clock:
-
-```text
-for tick in range(n_ticks):
-    apply shock if tick == shock_tick
-    reset event_volume
-    capture state and update sentiment once
-
-    while event_volume < Vstar:
-        activate fast agents
-        activate slow agents
-        count one sub-iteration
-
-    record diagnostics
-    apply payments once
-    generate dividend once
-```
-
-The important rule is that state capture and behavioral updates happen once per event tick, not once per inner sub-iteration. This keeps event time from becoming merely "more frequent sentiment updating".
-
-A safety cap `max_sub_iters` prevents infinite loops when the book becomes illiquid. If the volume threshold is not reached before the cap, the tick is marked as incomplete in diagnostics.
-
-#### Metrics
-
-The main H1/H2 outcome metrics remain:
-- `vol_ratio`,
-- `spread_ratio`,
-- `max_drawdown`,
-- `recovery_time`,
-- `mm_panic_ratio`.
-
-H2-specific diagnostics:
-- `mean_sub_iters_per_tick`,
-- `max_sub_iters_per_tick`,
-- `mean_tick_volume`,
-- `min_tick_volume`,
-- `total_traded_volume`,
-- `n_incomplete_ticks`.
-
-These diagnostics are necessary to verify that event time is actually operating as a volume clock.
-
-#### Output files
-
-Expected outputs:
-- `h2_event_time_raw.csv` — raw results,
-- `h2_event_time_agg.csv` — aggregated metrics,
-- `h2_event_time_tipping.csv` — `phi*` by mode and `Delta phi*`,
-- `h2_event_time_metrics.png` — multi-metric comparison of calendar vs event time,
-- `h2_event_time_heatmap.png` — heatmap of `vol_ratio` by mode and HFT share,
-- `h2_event_time_diagnostics.png` — volume-clock diagnostic plots.
-
-#### Interpretation rule
-
-H2 is supported if event time shifts the instability boundary to the right:
-
-```text
-phi*_event > phi*_calendar
-```
-
-and if event time does not simply hide the crisis by producing incomplete or degenerate ticks. Therefore, interpretation must always report both:
-- the shift in `phi*`,
-- the event-time diagnostics.
-
-Possible outcomes:
-- `phi*_event > phi*_calendar`: event time improves resilience,
-- `phi*_event = phi*_calendar`: no evidence that volume-clock timing changes the crisis boundary,
-- `phi*_event < phi*_calendar`: event time worsens stability in this model,
-- no `phi*` in event mode: event time may fully suppress the 1.3× tipping crossing, but diagnostics must confirm the simulation remained active and comparable.
-
 ### Follow-up 6: Presentation notebook (`/Users/arinaravilova/Desktop/unified_experiment_talk.ipynb`)
 
 Purpose:
@@ -1482,19 +1296,6 @@ Fix:
 Interpretation:
 - the original unified experiment results were already computed correctly
 - the error affected only the plotting stage, not the simulation results themselves
-
----
-
-## Planned but Not Yet Implemented
-
-### H2: Event Time (Volume Clock)
-- Architecture and standalone experiment script are prepared in `experiment_h2_event_time.py`.
-- Full experiment has not been run yet.
-- Next step: run a smoke test with small `n_runs` and `n_ticks`, inspect volume-clock diagnostics, then run the full `calendar` versus `event` grid.
-
-### H3: Volatility Clustering
-- Add `reaction_delay` parameter; factorial grid: delay × softlimit
-- Measure autocorrelation of |returns|
 
 ---
 
@@ -1548,7 +1349,6 @@ python experiment_h1_v9.py  # Runs full grid, outputs h1_v9_raw.csv and plots
 
 [1] Easley, López de Prado, O'Hara (2011) — Flow Toxicity and Flash Crash
 [2] Easley, López de Prado, O'Hara (2012) — Flow Toxicity in HF World
-[3] Easley, López de Prado, O'Hara (2012) — Volume Clock
 [4] Johnson et al. (2013) — Machine ecology beyond human response time
 [5] Kirilenko et al. (2017) — Flash Crash: HFT in Electronic Markets
 [6] Bookstaber & Paddrik (2015) — ABM for Crisis Liquidity Dynamics
