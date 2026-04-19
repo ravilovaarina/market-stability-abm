@@ -63,6 +63,7 @@ If you need the **post-unified follow-up analyses**, use:
 - `experiment_grid3_final_plots.py`
 - `experiment_speed_delay_mannwhitney.py`
 - `experiment_noisy_delay.py`
+- `experiment_shock_magnitude.py`
 
 If you need the **presentation / defense artifact**, use:
 - `/Users/arinaravilova/Desktop/unified_experiment_talk.ipynb`
@@ -214,6 +215,7 @@ cb3937d translate plots
 ├── experiment_grid3_final_plots.py  # Follow-up: final Grid 3 plots from unified_combined_raw.csv
 ├── experiment_speed_delay_mannwhitney.py  # Follow-up: Mann-Whitney tests for speed/delay effects at fixed phi
 ├── experiment_noisy_delay.py        # Follow-up: information delay only for noisy Random agents
+├── experiment_shock_magnitude.py    # Follow-up: robustness of phi* across shock magnitudes
 │
 ├── h1_description.md                # Detailed description of all H1 experiments (Russian)
 ├── h1_v9_raw.csv                    # Raw results: 1650 simulations
@@ -1078,23 +1080,203 @@ The experiment uses the same H1 metrics as the unified experiment:
 
 #### Output files
 
-Expected outputs:
+Outputs:
 - `noisy_delay_raw.csv` — raw simulation results,
 - `noisy_delay_agg.csv` — aggregated results,
 - `noisy_delay_tipping.csv` — tipping-point summary,
 - `noisy_delay_metrics.png` — multi-metric line plots with bootstrap CI,
 - `noisy_delay_heatmap.png` — heatmap of mean `vol_ratio`.
 
-#### Interpretation rule
+#### Results
+
+The experiment completed successfully:
+- total rows in `noisy_delay_raw.csv`: `1,650`,
+- parameter combinations: `5 lag values × 11 phi values = 55`,
+- every parameter combination has exactly `30` runs,
+- `speed_mult=1` throughout, matching the v9 priority-only speed setup.
+
+Tipping-point summary:
+
+| noisy info_lag | baseline vol_ratio at phi=0 | 1.3× threshold | max vol_ratio | phi at max | phi_star |
+|---:|---:|---:|---:|---:|---:|
+| 0 | 1.931 | 2.510 | 2.197 | 1.0 | — |
+| 1 | 2.188 | 2.845 | 2.440 | 0.7 | — |
+| 3 | 2.454 | 3.190 | 2.454 | 0.0 | — |
+| 5 | 2.202 | 2.862 | 2.437 | 0.7 | — |
+| 10 | 2.535 | 3.296 | 2.552 | 0.3 | — |
+
+Mean `vol_ratio` by noisy-agent lag and HFT fraction:
+
+| info_lag | phi=0.0 | phi=0.1 | phi=0.2 | phi=0.3 | phi=0.4 | phi=0.5 | phi=0.6 | phi=0.7 | phi=0.8 | phi=0.9 | phi=1.0 |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 1.931 | 2.116 | 2.148 | 2.029 | 2.082 | 1.843 | 1.936 | 1.884 | 2.055 | 1.940 | 2.197 |
+| 1 | 2.188 | 2.358 | 1.963 | 2.182 | 1.728 | 2.005 | 2.279 | 2.440 | 2.051 | 2.001 | 2.031 |
+| 3 | 2.454 | 2.102 | 2.257 | 2.216 | 2.055 | 2.111 | 2.115 | 1.989 | 1.919 | 2.060 | 2.424 |
+| 5 | 2.202 | 2.223 | 2.188 | 2.030 | 1.984 | 2.360 | 2.130 | 2.437 | 2.430 | 2.079 | 2.012 |
+| 10 | 2.535 | 2.114 | 2.149 | 2.552 | 2.219 | 2.516 | 2.453 | 1.964 | 2.336 | 2.135 | 1.842 |
+
+#### Interpretation
 
 This experiment should not be interpreted as a replacement for the unified delay grid. It is a mechanism-isolation experiment.
 
-Possible outcomes:
-- strong positive effect: noisy-agent delay is an independent instability source,
-- weak / absent effect: delay instability in the unified experiment likely comes mainly from slow chartist sentiment delay and delayed fundamentalist valuation,
-- non-monotonic effect: noisy delay changes liquidity provision/noise structure but does not create a clean tipping-point mechanism.
+The main result is negative but informative: noisy-agent information delay does **not** generate a systematic HFT-share tipping point.
 
-### Follow-up 5: Presentation notebook (`/Users/arinaravilova/Desktop/unified_experiment_talk.ipynb`)
+For every noisy lag value, `phi_star` is absent under the `1.3× baseline` rule. In other words, increasing the share of fast chartists does not push `vol_ratio` above the tipping threshold when the only delayed agents are noisy Random agents.
+
+The experiment does show some local increases in volatility:
+- `lag=1` reaches its maximum at `phi=0.7`,
+- `lag=5` reaches its maximum at `phi=0.7`,
+- `lag=10` reaches its maximum at `phi=0.3`.
+
+However, these increases are not monotonic in `phi`, do not cross the 1.3× threshold, and do not form a robust tipping pattern. At `lag=3`, the maximum `vol_ratio` is already at `phi=0.0`, which indicates that the higher baseline instability is not caused by a growing HFT share.
+
+The correct conclusion is:
+
+> Stale information among noisy Random agents alone is not enough to produce the H1 tipping mechanism. It may change the noise/liquidity background and raise volatility in some local regimes, but the strong delay effects in the unified experiment are more likely driven by delayed trend-following chartists and delayed fundamentalist order placement.
+
+#### Limitation
+
+The delay in this experiment affects noisy agents' limit-order pricing through delayed spread information. Market orders still execute against the current order book, because market orders in this simulator do not choose a price from observed spread information. This is consistent with the intended mechanism-isolation design: the experiment tests stale noisy order placement, not delayed execution.
+
+### Follow-up 5: Shock magnitude robustness experiment (`experiment_shock_magnitude.py`)
+
+This experiment was proposed to test whether the estimated HFT tipping point is robust to the size of the exogenous market shock.
+
+In the main unified experiment, the standard shock is:
+- `MarketPriceShock(it=200, dp=-10)`.
+
+The shock-magnitude experiment keeps the clean no-delay configuration and varies only the shock size:
+- `info_lag = 0`,
+- `shock_dp ∈ {-0.5, -1, -2, -5, -10}`,
+- `hft_frac ∈ {0.0, 0.1, ..., 1.0}`.
+
+#### Scientific purpose
+
+The goal is to determine whether the tipping point is a property of the market microstructure or mostly an artifact of a specific shock magnitude.
+
+Key question:
+
+> Does `phi*` remain near the same HFT share when the shock becomes weaker or stronger?
+
+If `phi*` is stable across shock magnitudes, then the tipping point can be interpreted as a robust market-structure threshold. If `phi*` moves substantially with `shock_dp`, then the result should be interpreted as shock-size-dependent.
+
+#### Experimental design
+
+- Population:
+  - 10 chartists,
+  - 10 fundamentalists,
+  - 5 random agents,
+  - 1 market maker.
+- Chartists:
+  - use `TrendChartist`,
+  - fast chartists have `speed='fast'`,
+  - slow chartists have `speed='slow'`,
+  - no information delay.
+- Fundamentalists:
+  - `access=1`,
+  - no information delay.
+- Random agents:
+  - no information delay.
+- MarketMaker:
+  - `softlimit=100`.
+- Shock:
+  - `MarketPriceShock(it=200, dp=shock_dp)`.
+- Simulation:
+  - `N=500` iterations,
+  - `30 runs` per parameter combination.
+
+Default script configuration:
+- `speed_multiplier=2`, matching the cleanest unified speed-grid result where `phi*=0.2`.
+
+For direct v9-style comparison, run the same script with:
+- `--speed-multiplier 1`.
+
+#### Grid size
+
+Default grid:
+- `5 shock magnitudes × 11 phi values × 30 runs = 1,650` simulations.
+
+#### Metrics
+
+The experiment uses the same H1 metrics:
+- `vol_ratio`,
+- `spread_ratio`,
+- `max_drawdown`,
+- `recovery_time`,
+- `mm_panic_ratio`.
+
+#### Output files
+
+Outputs:
+- `shock_magnitude_raw.csv` — raw simulation results,
+- `shock_magnitude_agg.csv` — aggregated results,
+- `shock_magnitude_tipping.csv` — tipping-point summary by shock magnitude,
+- `shock_magnitude_metrics.png` — multi-metric line plots with bootstrap CI,
+- `shock_magnitude_heatmap.png` — heatmap of mean `vol_ratio`.
+
+#### Results
+
+The experiment completed successfully:
+- total rows in `shock_magnitude_raw.csv`: `1,650`,
+- parameter combinations: `5 shock magnitudes × 11 phi values = 55`,
+- every parameter combination has exactly `30` runs,
+- `info_lag=0` throughout,
+- `speed_mult=2` throughout.
+
+The tested shock values are weaker versions of the original `dp=-10` benchmark plus the benchmark itself. The experiment does **not** test more extreme shocks such as `dp=-15` or `dp=-20`; those would be a separate catastrophic-shock regime.
+
+Tipping-point summary:
+
+| shock_dp | speed_mult | baseline vol_ratio at phi=0 | 1.3× threshold | phi_star | max vol_ratio | phi at max |
+|---:|---:|---:|---:|---:|---:|---:|
+| -0.5 | 2 | 1.726 | 2.244 | 0.4 | 3.186 | 1.0 |
+| -1.0 | 2 | 1.726 | 2.244 | 0.4 | 3.173 | 0.9 |
+| -2.0 | 2 | 1.761 | 2.289 | 0.3 | 3.136 | 1.0 |
+| -5.0 | 2 | 1.991 | 2.588 | 0.7 | 3.260 | 0.8 |
+| -10.0 | 2 | 2.312 | 3.006 | 0.5 | 3.722 | 0.9 |
+
+Mean `vol_ratio` by shock magnitude and HFT fraction:
+
+| shock_dp | phi=0.0 | phi=0.1 | phi=0.2 | phi=0.3 | phi=0.4 | phi=0.5 | phi=0.6 | phi=0.7 | phi=0.8 | phi=0.9 | phi=1.0 |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| -10.0 | 2.312 | 2.493 | 1.991 | 2.239 | 2.576 | 3.039 | 2.699 | 3.245 | 2.577 | 3.722 | 3.353 |
+| -5.0 | 1.991 | 1.971 | 2.485 | 2.548 | 2.242 | 2.329 | 2.436 | 2.765 | 3.260 | 3.007 | 2.579 |
+| -2.0 | 1.761 | 1.988 | 1.797 | 2.380 | 2.081 | 2.578 | 2.813 | 2.737 | 2.429 | 2.957 | 3.136 |
+| -1.0 | 1.726 | 1.868 | 1.893 | 1.843 | 2.777 | 2.114 | 2.482 | 2.601 | 3.120 | 3.173 | 3.067 |
+| -0.5 | 1.726 | 1.746 | 1.962 | 2.190 | 2.374 | 2.630 | 2.284 | 2.914 | 2.827 | 2.632 | 3.186 |
+
+#### Interpretation
+
+This is a robustness experiment, not a new mechanism. The main interpretation is based on the movement of `phi*`:
+- stable `phi*`: tipping point is relatively robust to shock size,
+- lower `phi*` for stronger shocks: large shocks make the market more fragile,
+- absent `phi*` for weak shocks: the HFT tipping mechanism may require a sufficiently large external disturbance,
+- highly non-monotonic `phi*`: tipping behavior is sensitive to the interaction between shock size and endogenous liquidity.
+
+The main result is that the tipping effect appears across all tested shock magnitudes, but the exact tipping point is not invariant.
+
+Observed `phi_star` values:
+- `dp=-0.5`: `phi*=0.4`,
+- `dp=-1`: `phi*=0.4`,
+- `dp=-2`: `phi*=0.3`,
+- `dp=-5`: `phi*=0.7`,
+- `dp=-10`: `phi*=0.5`.
+
+This supports the robustness of the HFT-instability mechanism in a limited sense: it is not an artifact of a single chosen shock size. Even weak shocks such as `dp=-0.5` and `dp=-1` produce a tipping point under the 1.3× baseline rule.
+
+However, the location of the tipping point shifts with shock magnitude. Therefore, `phi*` should not be presented as a universal constant. It is a regime-dependent estimate that depends on the size of the external shock and the baseline instability it creates.
+
+The non-monotonic movement of `phi*` is expected under a relative threshold rule. Stronger shocks increase post-shock instability even when `phi=0`, which raises the baseline and therefore also raises the `1.3× baseline` threshold. For example:
+- at `dp=-0.5`, baseline `vol_ratio=1.726` and threshold `=2.244`,
+- at `dp=-10`, baseline `vol_ratio=2.312` and threshold `=3.006`.
+
+Thus, a stronger shock does not necessarily produce a lower `phi*`, because the benchmark market without HFT is also more unstable.
+
+The correct conclusion is:
+
+> The HFT-related tipping effect is robust across the tested shock magnitudes, but the exact value of `phi*` is shock-size-dependent. The tipping point should be interpreted as a regime-dependent threshold rather than a fixed structural constant.
+
+### Follow-up 6: Presentation notebook (`/Users/arinaravilova/Desktop/unified_experiment_talk.ipynb`)
 
 Purpose:
 - convert raw results into a supervisor-facing discussion notebook
