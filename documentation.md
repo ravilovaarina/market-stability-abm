@@ -47,6 +47,12 @@ If you need the **current H1 analysis**, start with:
 - `unified_all_raw.csv`
 - `documentation.md`
 
+The final rerun of Grid 3 is stored in:
+- `unified_combined_raw.csv`
+- `unified_all_raw.csv`
+
+The files with `grid3_rerun` in their names belong to an earlier targeted rerun attempt. They are useful as a diagnostic / historical artifact, but they are **not** the final source of truth for Grid 3.
+
 If you need the **best single pre-unified experiment**, use:
 - `experiment_h1_v9.py`
 - `h1_v9_raw.csv`
@@ -54,7 +60,9 @@ If you need the **best single pre-unified experiment**, use:
 If you need the **post-unified follow-up analyses**, use:
 - `experiment_threshold_validation.py`
 - `experiment_grid3_rerun.py`
+- `experiment_grid3_final_plots.py`
 - `experiment_speed_delay_mannwhitney.py`
+- `experiment_noisy_delay.py`
 
 If you need the **presentation / defense artifact**, use:
 - `/Users/arinaravilova/Desktop/unified_experiment_talk.ipynb`
@@ -63,10 +71,14 @@ If you need the **presentation / defense artifact**, use:
 
 - `phi` / `hft_frac`
   - share of fast HFT-type chartists among all chartists
+  - this is not a share of all agents in the market
+  - for example, with 10 chartists, `phi=0.4` means 4 fast chartists and 6 slow chartists
 - `speed_multiplier`
   - how many times fast agents act per iteration
+  - this models execution-speed advantage as both priority within the iteration and more trading opportunities per iteration
 - `info_lag`
   - how many iterations old the visible price/spread information is for delayed agents
+  - in the unified experiment, delayed slow chartists also use lagged price changes when updating sentiment
 - `vol_ratio`
   - primary instability metric:
     - post-shock volatility divided by pre-shock volatility
@@ -98,10 +110,7 @@ If you need the **presentation / defense artifact**, use:
 - information delay raises baseline instability
 - combined speed+delay effects exist, but are **regime-dependent**
 - `speed×5` is a **non-monotonic / extreme regime**, not a stronger confirmation of H1
-
-### Less reliable / incomplete area
-
-- the heaviest part of Grid 3 rerun, especially around `speed×3, lag=5`
+- the final Grid 3 rerun supports a conditional version of H1: latency heterogeneity can create tipping behavior, but not uniformly across all speed and delay regimes
 
 ### Important pitfalls
 
@@ -110,15 +119,26 @@ If you need the **presentation / defense artifact**, use:
 - H1-confirming behavior uses `TrendChartist` / `SlowTrendChartist`, defined inside experiment files.
 - `general_states()` is unreliable for H1 inference; use direct metrics such as `vol_ratio`.
 - Some interpretation files were added later than the original experiments; always distinguish raw simulation output from later presentation artifacts.
+- `grid3_rerun_*` files are from an earlier partial targeted rerun and should not be used as the final Grid 3 result.
+- The final Grid 3 result is in `unified_combined_raw.csv` and is included in `unified_all_raw.csv`.
+- Mann-Whitney tests are one-sided and uncorrected for multiple comparisons; they should be treated as supportive evidence, not as standalone proof.
 
 ---
 
 ## Three Hypotheses
 
 ### H1: Latency Heterogeneity and the Tipping Point (IMPLEMENTED & TESTED)
-An increase in the proportion of high-frequency traders with execution-speed advantage leads to higher post-shock market volatility and reduced liquidity, exhibiting a non-linear (tipping-point) transition beyond a critical threshold phi*.
+An increase in the proportion of high-frequency traders with execution-speed advantage can lead to higher post-shock market volatility and reduced liquidity, exhibiting a non-linear transition beyond a critical threshold `phi*`.
 
-**Status:** Confirmed for lag=0. Tipping point found at phi* = 0.4.
+**Status:** Supported, with important regime dependence.
+
+The cleanest support comes from the speed-only unified grid, especially `speed_multiplier=2`, where the 1.3× tipping point appears at `phi*=0.2`. The final combined Grid 3 rerun confirms that speed effects can persist when information delay is also present, especially around `speed×3`, but the effect is not universal across all speed and delay regimes.
+
+The correct interpretation is not "more speed always means more instability." Instead:
+- moderate execution-speed advantage can create a tipping point,
+- information delay raises baseline instability,
+- combined speed+delay effects are regime-dependent,
+- extreme `speed×5` produces non-monotonic dynamics and should not be treated as stronger confirmation of H1.
 
 ### H2: Calendar Time versus Event Time (DESIGNED, NOT YET IMPLEMENTED)
 Updating information in event time (volume clock) as opposed to real calendar time can alter market resilience and shift the boundary at which crises occur. Markets operating on an event-time basis should be more robust, effectively raising the tipping-point threshold.
@@ -191,7 +211,9 @@ cb3937d translate plots
 ├── experiment_unified.py            # Unified experiment: Grid 1 (speed), Grid 2 (delay), Grid 3 (combined)
 ├── experiment_threshold_validation.py  # Follow-up: justifies 1.3× baseline tipping threshold
 ├── experiment_grid3_rerun.py        # Follow-up: targeted Grid 3 rerun with resume support
+├── experiment_grid3_final_plots.py  # Follow-up: final Grid 3 plots from unified_combined_raw.csv
 ├── experiment_speed_delay_mannwhitney.py  # Follow-up: Mann-Whitney tests for speed/delay effects at fixed phi
+├── experiment_noisy_delay.py        # Follow-up: information delay only for noisy Random agents
 │
 ├── h1_description.md                # Detailed description of all H1 experiments (Russian)
 ├── h1_v9_raw.csv                    # Raw results: 1650 simulations
@@ -202,8 +224,8 @@ cb3937d translate plots
 │
 ├── unified_speed_raw.csv            # Grid 1 raw results (1,320 rows)
 ├── unified_delay_raw.csv            # Grid 2 raw results (1,650 rows)
-├── unified_combined_raw.csv         # Grid 3 raw results (1,056 rows)
-├── unified_all_raw.csv              # All grids concatenated (used by follow-up scripts)
+├── unified_combined_raw.csv         # Final Grid 3 raw results (2,160 rows)
+├── unified_all_raw.csv              # All grids concatenated (5,130 rows; used by follow-up scripts)
 ├── unified_speed.png                # Grid 1 metrics + sensitivity table
 ├── unified_delay.png                # Grid 2 metrics + heatmap
 ├── unified_stats.png                # Mann-Whitney bar plots + sensitivity table
@@ -742,10 +764,27 @@ At high `speed_multiplier` (≥2), fast agents can exhaust the order book entire
 
 ### Three experimental grids
 
-- **Grid 1 (Speed):** speed_multiplier ∈ {1,2,3,5} × hft_frac ∈ {0.0–1.0} × 30 runs = 1,320 simulations
-- **Grid 2 (Delay):** info_lag ∈ {0,1,3,5,10} × hft_frac ∈ {0.0–1.0} × 30 runs = 1,650 simulations
-- **Grid 3 (Combined):** speed_multiplier ∈ {2,3} × info_lag ∈ {1,3,5} × hft_frac step 0.2 × 30 runs = 1,056 simulations
-- **Total: 4,026 simulations**
+- **Grid 1 (Speed):**
+  - `speed_multiplier ∈ {1, 2, 3, 5}`
+  - `hft_frac ∈ {0.0, 0.1, ..., 1.0}`
+  - `info_lag = 0`
+  - `30 runs` per parameter combination
+  - total: `4 × 11 × 30 = 1,320` simulations
+- **Grid 2 (Delay):**
+  - `info_lag ∈ {0, 1, 3, 5, 10}`
+  - `hft_frac ∈ {0.0, 0.1, ..., 1.0}`
+  - `speed_multiplier = 1`
+  - `30 runs` per parameter combination
+  - total: `5 × 11 × 30 = 1,650` simulations
+- **Grid 3 (Combined, final rerun):**
+  - `speed_multiplier ∈ {2, 3, 5}`
+  - `info_lag ∈ {1, 3, 5, 10}`
+  - `hft_frac ∈ {0.0, 0.2, 0.4, 0.6, 0.8, 1.0}`
+  - `30 runs` per parameter combination
+  - total: `3 × 4 × 6 × 30 = 2,160` simulations
+- **Total unified raw simulations:** `1,320 + 1,650 + 2,160 = 5,130` rows in `unified_all_raw.csv`
+
+Note: when grouping `unified_all_raw.csv`, always include the `grid` column. Some parameter combinations, especially `speed_multiplier=1, info_lag=0`, appear in both Grid 1 and Grid 2 and therefore have 60 rows if grouped without `grid`.
 
 ### Statistical methods
 
@@ -757,9 +796,10 @@ At high `speed_multiplier` (≥2), fast agents can exhaust the order book entire
 
 | File | Contents |
 |------|----------|
-| `unified_speed_raw.csv` | Grid 1 raw results (1,320 rows) |
-| `unified_delay_raw.csv` | Grid 2 raw results (1,650 rows) |
-| `unified_combined_raw.csv` | Grid 3 raw results (1,056 rows) |
+| `unified_speed_raw.csv` | Grid 1 raw results, 1,320 rows |
+| `unified_delay_raw.csv` | Grid 2 raw results, 1,650 rows |
+| `unified_combined_raw.csv` | Final Grid 3 raw results, 2,160 rows |
+| `unified_all_raw.csv` | All unified grids concatenated, 5,130 rows |
 | `unified_speed.png` | Grid 1 metrics + sensitivity table |
 | `unified_delay.png` | Grid 2 metrics + heatmap |
 | `unified_stats.png` | Mann-Whitney bar plots + sensitivity table |
@@ -773,7 +813,7 @@ At high `speed_multiplier` (≥2), fast agents can exhaust the order book entire
 | speed_mult | baseline vol (φ=0) | max vol | tipping (1.3×) | p-value at tipping |
 |:---:|:---:|:---:|:---:|:---:|
 | 1 | 2.123 | 3.264 (φ=0.6) | φ=0.6 | p=0.033 * |
-| **2** | **1.746** | **3.392 (φ=0.4)** | **φ=0.2** | **p=0.002 **** |
+| **2** | **1.746** | **3.392 (φ=0.4)** | **φ=0.2** | p=0.002 ** |
 | 3 | 2.051 | 3.401 (φ=0.9) | φ=0.3 | p=0.034 * |
 | 5 | 2.467 | 2.746 (φ=0.1) | — | n.s. |
 
@@ -800,22 +840,63 @@ At high `speed_multiplier` (≥2), fast agents can exhaust the order book entire
 | 1.4× | 0.2 |
 | 1.5× | 0.4 |
 
-### Combined Grid (Grid 3) — regime-dependent result
+### Final Grid 3 rerun: combined speed + delay experiment
 
 The combined experiment answers the supervisor's specific question: **is there a regime where information delay and speed multiplier are present simultaneously?** Yes — this is Grid 3.
 
-Representative Grid 3 results:
+The final Grid 3 rerun is stored in `unified_combined_raw.csv` and included in `unified_all_raw.csv`. This rerun replaced the earlier partial `grid3_rerun_*` attempt as the source of truth for the combined regime.
 
-| speed_mult | lag | baseline vol (φ=0) | tipping (1.3×) | interpretation |
-|:---:|:---:|:---:|:---:|:---|
-| 2 | 1 | 2.347 | φ = 1.0 | effect exists, but only at the extreme HFT share |
-| 2 | 3 | 2.596 | φ = 1.0 | same pattern; delay already raises baseline instability |
-| 2 | 5 | 2.340 | φ = 0.4 | clear tipping point in combined regime |
-| 3 | 1 | 2.178 | φ = 0.2 | strongest combined-regime result |
-| 3 | 3 | 2.141 | φ = 0.4 | combined effect persists, but threshold shifts |
-| 3 | 5 | 2.700 | — | no tipping point under the 30% rule |
+The final combined grid is complete:
+- `speed_multiplier ∈ {2, 3, 5}`
+- `info_lag ∈ {1, 3, 5, 10}`
+- `hft_frac ∈ {0.0, 0.2, 0.4, 0.6, 0.8, 1.0}`
+- `30 runs` per combination
+- total: `2,160` successful simulations
+- every parameter combination has exactly 30 runs
 
-**Interpretation:** Grid 3 is informative, but heterogeneous. It should be presented as a **robustness / interaction experiment**, not as the single cleanest proof. Its main value is showing that the speed effect can survive in the presence of delay, but only in part of the parameter space.
+The earlier files:
+- `grid3_rerun_raw.csv`
+- `grid3_rerun_agg.csv`
+- `grid3_rerun_skips.csv`
+- `grid3_rerun.png`
+
+belong to a previous targeted rerun attempt. That attempt was useful for debugging and partial verification, but it remained incomplete in the heaviest regimes. It should be treated as a historical diagnostic artifact, not as the final Grid 3 dataset.
+
+#### Grid 3 results
+
+| speed_mult | info_lag | baseline vol_ratio at phi=0 | 1.3× threshold | tipping point phi* | Interpretation |
+|---:|---:|---:|---:|---:|---|
+| 2 | 1 | 2.347 | 3.050 | 1.0 | effect appears only at full HFT share |
+| 2 | 3 | 2.596 | 3.375 | 1.0 | delay raises baseline; tipping only at full HFT share |
+| 2 | 5 | 2.340 | 3.042 | 0.4 | clear combined-regime tipping point |
+| 2 | 10 | 2.366 | 3.076 | 0.8 | delayed but visible tipping |
+| 3 | 1 | 2.178 | 2.831 | 0.2 | strongest combined-regime support |
+| 3 | 3 | 2.141 | 2.783 | 0.4 | combined effect persists |
+| 3 | 5 | 2.700 | 3.510 | — | high baseline masks the HFT tipping effect |
+| 3 | 10 | 2.238 | 2.910 | 0.4 | combined effect reappears |
+| 5 | 1 | 2.640 | 3.432 | — | extreme speed regime, non-monotonic |
+| 5 | 3 | 2.777 | 3.610 | — | extreme speed regime, no 1.3× tipping |
+| 5 | 5 | 2.526 | 3.284 | — | extreme speed regime, no 1.3× tipping |
+| 5 | 10 | 2.466 | 3.206 | 0.4 | local crossing, but still non-monotonic overall |
+
+#### Interpretation
+
+The final Grid 3 rerun shows that the combined effect of execution speed and information delay is **real but regime-dependent**.
+
+The strongest combined-regime support appears around `speed×3`:
+- at `lag=1`, tipping occurs already at `phi*=0.2`
+- at `lag=3`, tipping occurs at `phi*=0.4`
+- at `lag=10`, tipping occurs at `phi*=0.4`
+
+This means that the speed effect does survive in the presence of information delay, but only in part of the parameter space.
+
+At the same time, Grid 3 does **not** support a simple monotone claim that more speed always produces more instability. In particular, `speed×5` behaves as an extreme regime. The volatility curve becomes non-monotonic, and the 1.3× tipping rule usually does not detect a stable tipping point. This should be interpreted as a different microstructure regime rather than as stronger confirmation of H1.
+
+The most defensible conclusion is:
+
+> Latency heterogeneity can generate post-shock instability and tipping behavior, especially under moderate execution-speed advantage. However, the combined speed-delay effect is conditional on the microstructure regime. Information delay raises baseline instability, and extreme speed advantage can produce non-monotonic dynamics rather than a clean tipping pattern.
+
+Therefore, Grid 3 should be presented as a robustness / interaction experiment. It strengthens H1 by showing that speed effects can persist when information delay is also present, but it also narrows the hypothesis: the effect is not universal across all speed and delay combinations.
 
 ### Five conclusions
 
@@ -867,29 +948,42 @@ Output files:
 - `threshold_validation_heatmap.png`
 - `threshold_validation_report.md`
 
-### Follow-up 2: Targeted Grid 3 rerun (`experiment_grid3_rerun.py`)
+### Follow-up 2: Final Grid 3 rerun and historical targeted rerun
 
-Purpose:
-- recompute only the combined grid,
-- save results separately from the original unified experiment,
-- support resume / incremental saving / skip logging.
+The final Grid 3 rerun is now part of the unified experiment outputs:
+- `unified_combined_raw.csv`
+- `unified_all_raw.csv`
 
-Motivation:
-- Grid 3 is the most computationally expensive block
-- the original combined grid used timeout-based skipping
-- the rerun script was created to re-check the combined regime without touching Grid 1 or Grid 2
+Purpose of the final rerun:
+- recompute the full combined grid after stabilizing the simulation pipeline,
+- include `speed_multiplier ∈ {2, 3, 5}`,
+- include `info_lag ∈ {1, 3, 5, 10}`,
+- keep `30 runs` per parameter combination,
+- make Grid 3 directly comparable with Grid 1 and Grid 2 inside `unified_all_raw.csv`.
 
-Key design features:
-- outputs saved separately:
-  - `grid3_rerun_raw.csv`
-  - `grid3_rerun_skips.csv`
-  - `grid3_rerun_agg.csv`
-  - `grid3_rerun.png`
-- supports command-line restriction to specific `speed_mult`, `lag`, `phi` subsets
-- supports resume from partially completed reruns
+Final status:
+- `unified_combined_raw.csv` contains `2,160` successful simulations,
+- every Grid 3 parameter combination has exactly `30` runs,
+- this is the final source of truth for the combined speed+delay experiment.
 
-Current status:
-- this rerun is intended as a **targeted verification tool**, not as a replacement for the already computed unified experiment
+#### Historical note: earlier targeted Grid 3 rerun (`experiment_grid3_rerun.py`)
+
+Before the final unified Grid 3 rerun, a separate targeted rerun script was created:
+- `experiment_grid3_rerun.py`
+- `grid3_rerun_raw.csv`
+- `grid3_rerun_agg.csv`
+- `grid3_rerun_skips.csv`
+- `grid3_rerun.png`
+
+Its purpose was to recompute only selected combined regimes with resume support and skip logging. This was useful while diagnosing long-running / timeout-prone combinations.
+
+However, this earlier targeted rerun is **not** the final combined-grid result. It remained partial in the heaviest regimes, especially around `speed×3, lag=5`.
+
+The final source of truth is now:
+- `unified_combined_raw.csv`
+- `unified_all_raw.csv`
+
+The `grid3_rerun_*` files should be kept only as a historical diagnostic artifact.
 
 ### Follow-up 3: Additional Mann-Whitney analyses (`experiment_speed_delay_mannwhitney.py`)
 
@@ -910,7 +1004,97 @@ Outputs:
 - `delay_effect_mannwhitney.png`
 - `speed_delay_effect_mannwhitney_report.md`
 
-### Follow-up 4: Presentation notebook (`/Users/arinaravilova/Desktop/unified_experiment_talk.ipynb`)
+### Follow-up 4: Noisy-agent information delay experiment (`experiment_noisy_delay.py`)
+
+This experiment was proposed to isolate whether information delay among noisy / random traders is an independent source of instability.
+
+In the unified experiment, `info_lag` is applied to slow informed / behavioral traders:
+- slow chartists use lagged price changes in sentiment updating,
+- slow chartists and fundamentalists use delayed spread/price information in order placement.
+
+The noisy-delay experiment changes this design:
+- `TrendChartist` agents work without information delay,
+- `Fundamentalist` agents work without information delay,
+- `MarketMaker` works without information delay,
+- only noisy `Random` agents receive delayed spread information.
+
+#### Important implementation detail
+
+The base `Random.call()` method in `AgentBasedModel/agents/agents.py` uses `self.market.spread()` directly. Therefore, simply passing `info_lag` to `Random` would not actually delay its visible spread.
+
+For this experiment, the script defines a local `DelayedRandom(Random)` subclass. It keeps the same random trading probabilities as the original `Random` agent, but replaces direct spread access with `_get_spread()`. This makes the delay operational only for noisy agents.
+
+#### Scientific purpose
+
+The goal is to separate two mechanisms:
+- instability caused by delayed trend-following / informed behavioral agents,
+- instability caused by stale noisy order placement.
+
+If volatility rises when only noisy agents are delayed, then noisy-trader information delay is an independent instability channel. If the effect is weak or absent, then the stronger delay effects in the unified experiment are likely driven mainly by `SlowTrendChartist` and delayed `Fundamentalist` behavior.
+
+#### Experimental design
+
+- Population:
+  - 10 chartists,
+  - 10 fundamentalists,
+  - 5 noisy random agents,
+  - 1 market maker.
+- `hft_frac` / `phi`:
+  - share of chartists marked as fast HFT-type trend chartists,
+  - `phi ∈ {0.0, 0.1, ..., 1.0}`.
+- `info_lag`:
+  - applied only to `DelayedRandom` agents,
+  - `lag ∈ {0, 1, 3, 5, 10}`.
+- Fast chartists:
+  - use `TrendChartist`,
+  - `speed='fast'`,
+  - no information delay.
+- Slow chartists:
+  - also use `TrendChartist`,
+  - `speed='slow'`,
+  - no information delay.
+- Fundamentalists:
+  - `info_lag=0`,
+  - no delayed information.
+- Random agents:
+  - use `DelayedRandom`,
+  - `info_lag=lag`.
+- Simulation setup:
+  - `N=500` iterations,
+  - shock at `it=200`,
+  - `MarketPriceShock(200, -10)`,
+  - `30 runs` per parameter combination.
+- Total:
+  - `11 phi values × 5 lag values × 30 runs = 1,650` simulations.
+
+#### Metrics
+
+The experiment uses the same H1 metrics as the unified experiment:
+- `vol_ratio`,
+- `spread_ratio`,
+- `max_drawdown`,
+- `recovery_time`,
+- `mm_panic_ratio`.
+
+#### Output files
+
+Expected outputs:
+- `noisy_delay_raw.csv` — raw simulation results,
+- `noisy_delay_agg.csv` — aggregated results,
+- `noisy_delay_tipping.csv` — tipping-point summary,
+- `noisy_delay_metrics.png` — multi-metric line plots with bootstrap CI,
+- `noisy_delay_heatmap.png` — heatmap of mean `vol_ratio`.
+
+#### Interpretation rule
+
+This experiment should not be interpreted as a replacement for the unified delay grid. It is a mechanism-isolation experiment.
+
+Possible outcomes:
+- strong positive effect: noisy-agent delay is an independent instability source,
+- weak / absent effect: delay instability in the unified experiment likely comes mainly from slow chartist sentiment delay and delayed fundamentalist valuation,
+- non-monotonic effect: noisy delay changes liquidity provision/noise structure but does not create a clean tipping-point mechanism.
+
+### Follow-up 5: Presentation notebook (`/Users/arinaravilova/Desktop/unified_experiment_talk.ipynb`)
 
 Purpose:
 - convert raw results into a supervisor-facing discussion notebook
