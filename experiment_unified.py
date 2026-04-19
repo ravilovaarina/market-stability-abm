@@ -364,12 +364,12 @@ def _timeout_handler(signum, frame):
 
 
 def run_grid_combined(n_runs=30, n_iter=500, shock_it=200, shock_dp=-10, softlimit=100):
-    """Grid 3: speed_multiplier × info_lag × hft_frac (reduced to avoid OrderList hanging)."""
+    """Grid 3: speed_multiplier × info_lag × hft_frac (full grid after OrderList fix)."""
     records = []
-    speed_mults = [2, 3]
-    info_lags = [1, 3, 5]
+    speed_mults = [2, 3, 5]
+    info_lags = [1, 3, 5, 10]
     hft_fracs = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
-    TIMEOUT_SEC = 30  # max seconds per single simulation
+    TIMEOUT_SEC = 30  # safety net: should no longer trigger after orders.py fix
 
     total = len(speed_mults) * len(info_lags) * len(hft_fracs) * n_runs
     print(f'Grid 3 (combined): {len(speed_mults)} × {len(info_lags)} × {len(hft_fracs)} × {n_runs} = {total} runs')

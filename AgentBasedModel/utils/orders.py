@@ -175,9 +175,6 @@ class OrderList:
         order.right = self.first
         self.first = order
 
-        if order.order_type != self.order_type:
-            raise ValueError(f'Wrong order type! OrderList: {self.order_type}, Order: {order.order_type}')
-
     def insert(self, order: Order):
         """
         Inserts order preserving best-offer -> worst-offer
@@ -189,9 +186,10 @@ class OrderList:
         if order.order_type != self.order_type:
             raise ValueError(f'Wrong order type! OrderList: {self.order_type}, Order: {order.order_type}')
 
-        # If empty
+        # If empty — append and return (fixed: missing return caused self-loop)
         if self.first is None:
             self.append(order)
+            return
 
         # Insert order in the beginning
         if order <= self.first:
@@ -203,10 +201,8 @@ class OrderList:
         # Insert order in the middle
         for val in self:
             if order <= val:
-                # If only 1 order in self
-                if self.first == self.last:
-                    self.push(order)
-
+                # If val is the first element, we already handled it above;
+                # here val.left is guaranteed not None.
                 order.left = val.left
                 order.right = val
                 order.left.right = order
