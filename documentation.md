@@ -1097,3 +1097,195 @@ phi*_calendar vs phi*_event_time
 ```
 
 inside the same H1-unified environment.
+
+---
+
+## Final H2-Clean Experiment: Volume-Matched Calendar vs Event Time
+
+### Branch Hygiene Note
+
+This experiment belongs to the H2 branch:
+
+```text
+h2-event-time-volume-clock
+```
+
+It was originally created by mistake while working on the H3 branch. The H3 branch was cleaned:
+
+- H2 volume-matched code and output files were removed from H3;
+- the H2 documentation block was removed from H3 documentation;
+- H3 section numbering was restored there.
+
+The corrected H2-clean experiment is now placed on the H2 branch as:
+
+```text
+experiment_h2_volume_matched.py
+```
+
+### Why This Additional H2 Experiment Was Needed
+
+The earlier H2 experiment compared calendar time and event time, but one concern remained: if the two clocks produce different total trading volume, then any difference in volatility may come from a different amount of market activity rather than from the clock itself.
+
+The H2-clean experiment therefore asks a narrower and cleaner question:
+
+```text
+If calendar-time and event-time runs are matched by total executed volume,
+does the event-time clock still change post-shock instability?
+```
+
+This is a cleaner H2 test because it controls the main confound: different exposure to trading activity.
+
+### Experimental Architecture
+
+The experiment uses paired simulations. For each `(run, hft_frac)` pair:
+
+1. Run the calendar-time simulation first.
+2. Measure its realized total executed volume.
+3. Run the event-time simulation with the same seed and same agent composition.
+4. Stop the event-time simulation when it reaches approximately the same total executed volume as the calendar run.
+5. Compare event-time minus calendar-time metrics within the same pair.
+
+The paired design is important because it reduces noise: each event-time result is compared to its own calendar-time counterpart rather than to an unrelated simulation.
+
+### Implementation Details
+
+The script is self-contained on the H2 branch and reuses local H2-safe components from `experiment_h2_event_time.py`:
+
+- `VolumeExchangeAgent`
+- `TrendChartist`
+- `SafeFundamentalist`
+- `SafeMarketMaker`
+- safe order-book patching via `patch_order_list_insert()`
+- H2-compatible metrics such as `price_vol_ratio`, `spread_ratio`, `max_drawdown`, `recovery_time`, and `mm_stress_ratio`
+
+The exchange used in the new script is:
+
+```text
+LoggingExchange(VolumeExchangeAgent)
+```
+
+It records executed volume per tick and cumulative executed volume.
+
+Calendar mode:
+
+```text
+one simulation tick = one ordinary calendar iteration
+```
+
+Event-time mode:
+
+```text
+one simulation tick = trading continues until the volume threshold is reached
+```
+
+But unlike the previous Vstar-grid H2 experiment, this version does not compare several fixed `Vstar` values. Instead, it matches the event-time run to the realized calendar total volume.
+
+### Grid
+
+The final run used:
+
+| Parameter | Values |
+|---|---|
+| `hft_frac` | `{0.0, 0.2, 0.4, 0.6}` |
+| modes | `calendar`, `event_time` |
+| runs per cell | 50 |
+| total raw rows | 400 |
+| paired comparisons | 200 |
+| shock | `MarketPriceShock(t=200, dp=-10)` |
+| horizon | 500 calendar ticks for calendar mode |
+
+The row counts are:
+
+| File | Rows |
+|---|---:|
+| `h2_volume_matched_raw.csv` | 400 |
+| `h2_volume_matched_agg.csv` | 8 |
+| `h2_volume_matched_paired_diffs.csv` | 200 |
+| `h2_volume_matched_diff_summary.csv` | 4 |
+
+### Output Files
+
+```text
+h2_volume_matched_raw.csv
+h2_volume_matched_agg.csv
+h2_volume_matched_paired_diffs.csv
+h2_volume_matched_diff_summary.csv
+h2_volume_matched_metrics.png
+h2_volume_matched_diffs.png
+```
+
+### Volume-Matching Diagnostics
+
+All shocks were triggered:
+
+| Mode | Shock-triggered share |
+|---|---:|
+| calendar | 1.0 |
+| event_time | 1.0 |
+
+The calendar run has zero matching error by construction. The event-time run cannot always stop at exactly the same cumulative volume because trades are discrete, but the mismatch is small relative to total volume:
+
+| Mode | Mean volume match error | Min | Max |
+|---|---:|---:|---:|
+| calendar | 0.00 | 0.0 | 0.0 |
+| event_time | 8.26 | 0.0 | 38.0 |
+
+Calendar total executed volume ranges from roughly 6,448 to 8,481 units depending on `hft_frac`, so the average event-time mismatch is small.
+
+### Aggregated Results
+
+| Mode | `hft_frac` | `vol_ratio` | realized vol / volume | max drawdown | recovery time | total volume | volume/tick | ticks |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| calendar | 0.0 | 2.343 | 0.000344 | 0.150 | 30.12 | 6448.18 | 12.90 | 500.00 |
+| calendar | 0.2 | 2.349 | 0.000419 | 0.179 | 39.16 | 7114.10 | 14.23 | 500.00 |
+| calendar | 0.4 | 2.795 | 0.000449 | 0.212 | 47.68 | 7797.80 | 15.60 | 500.00 |
+| calendar | 0.6 | 2.886 | 0.000460 | 0.226 | 46.60 | 8481.16 | 16.96 | 500.00 |
+| event_time | 0.0 | 2.296 | 0.000338 | 0.145 | 20.84 | 6455.96 | 12.88 | 501.42 |
+| event_time | 0.2 | 2.499 | 0.000427 | 0.177 | 33.76 | 7121.46 | 14.39 | 496.22 |
+| event_time | 0.4 | 2.740 | 0.000424 | 0.183 | 32.88 | 7805.96 | 15.71 | 497.48 |
+| event_time | 0.6 | 2.799 | 0.000460 | 0.219 | 45.10 | 8490.90 | 17.06 | 499.08 |
+
+### Paired Event-Time Minus Calendar-Time Differences
+
+Positive values mean event time produced a higher metric than calendar time. Negative values mean event time produced a lower metric.
+
+| `hft_frac` | Δ `vol_ratio` | 95% CI | Δ realized vol / volume | 95% CI | Δ max drawdown | 95% CI | Δ ticks | 95% CI |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0.0 | -0.048 | [-0.449, 0.327] | -0.000006 | [-0.000058, 0.000043] | -0.005 | [-0.018, 0.008] | 1.42 | [-5.60, 8.54] |
+| 0.2 | 0.150 | [-0.271, 0.570] | 0.000008 | [-0.000068, 0.000084] | -0.002 | [-0.021, 0.014] | -3.78 | [-12.58, 4.78] |
+| 0.4 | -0.055 | [-0.542, 0.413] | -0.000025 | [-0.000101, 0.000058] | -0.029 | [-0.051, -0.003] | -2.52 | [-10.84, 5.54] |
+| 0.6 | -0.087 | [-0.495, 0.335] | -0.000001 | [-0.000067, 0.000064] | -0.007 | [-0.034, 0.022] | -0.92 | [-9.46, 7.90] |
+
+### Interpretation
+
+The volume-matched H2 experiment does not support a strong claim that event time mechanically stabilizes the market.
+
+The main evidence:
+
+- `vol_ratio` differences are small and all 95% confidence intervals include zero;
+- realized volatility per unit of executed volume is almost unchanged;
+- max drawdown is slightly lower under event time, especially at `hft_frac=0.4`, where the confidence interval is below zero;
+- event-time and calendar-time runs use almost the same total executed volume, so this comparison is cleaner than the earlier fixed-`Vstar` comparison.
+
+The strongest safe conclusion is:
+
+```text
+After matching total executed volume, event time does not materially change
+the post-shock volatility ratio relative to calendar time in this configuration.
+There is weak evidence that event time can reduce drawdown in the mid-HFT-share
+regime, but not enough to claim broad market stabilization.
+```
+
+### Final H2 Conclusion
+
+H2 is not confirmed in the strong form.
+
+The evidence supports a weaker interpretation:
+
+```text
+Calendar-time and event-time measurement choices affect the representation
+of trading activity, but once total executed volume is controlled, the H1
+instability pattern is not primarily an artifact of the calendar clock.
+```
+
+This is still useful for the paper because it strengthens H1: the tipping behavior is not simply caused by counting time in calendar iterations.
