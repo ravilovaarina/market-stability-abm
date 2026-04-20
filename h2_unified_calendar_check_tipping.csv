@@ -1,0 +1,2 @@
+regime,mode,volume_threshold,baseline_vol_ratio,threshold_1_3x,phi_star,max_vol_ratio,phi_at_max,n_runs_per_phi_min,n_runs_per_phi_max
+calendar,calendar,,1.7459916904523225,2.269789197588019,0.2,3.392499547434251,0.4,30,30

@@ -1279,6 +1279,427 @@ Purpose:
 
 This notebook is a presentation artifact, not part of the simulation pipeline.
 
+---
+
+## H2 on H1 Unified Environment: Event-Time / Volume-Clock Experiment
+
+### Why this version exists
+
+The first H2 implementation was written as a standalone experiment on a clean baseline branch. It was useful
+for developing the volume-clock mechanism, but it had a major comparability problem:
+
+- H1 unified `speed×2` produced the main speed-only tipping point around `phi*=0.2`;
+- standalone H2 calendar `speed×2` produced a much later tipping point around `phi*=0.7`.
+
+This means the standalone H2 calendar baseline was not reproducing the H1 speed experiment closely enough.
+For the final H2 test, the correct design is therefore:
+
+> keep the H1 unified environment fixed and change only the timekeeping mechanism.
+
+The new H2 experiment is implemented in:
+
+```text
+experiment_h2_event_time_unified.py
+```
+
+### Hypothesis tested
+
+**H2: Calendar Time versus Event Time**
+
+Updating market state in event time, using a volume clock, may make the market more resilient and shift the
+tipping point `phi*` relative to the same market in calendar time.
+
+The comparison is:
+
+```text
+phi*_calendar_unified vs phi*_event_time_unified
+```
+
+### What stays identical to H1
+
+The H2-on-H1 experiment reuses the H1 unified components:
+
+- `TrendChartist`
+- `SlowTrendChartist`
+- `SimulatorUnified`
+- `create_population`
+- `vol_ratio`
+- `spread_ratio`
+- `max_drawdown`
+- `recovery_time`
+- one-sided Mann-Whitney U testing
+- bootstrap confidence intervals
+- `1.3× baseline` tipping rule
+
+The default final configuration is the H1 speed-only setting:
+
+```text
+info_lag = 0
+speed_multiplier = 2
+n_iter = 500
+shock_it = 200
+shock_dp = -10
+n_runs = 30
+population = 10 Fundamentalists + 10 TrendChartists + 5 Random + 1 MarketMaker
+```
+
+The calendar branch uses the same calendar simulator logic as unified H1:
+
+```text
+SimulatorUnified.simulate(..., speed_multiplier=2)
+```
+
+Calendar seeds intentionally follow the unified H1 speed-grid formula:
+
+```text
+seed = run * 10000 + int(phi * 10) * 100 + speed_multiplier
+```
+
+This is the key sanity check: calendar H2 should reproduce the H1 `speed×2` result closely.
+
+### Why the H1 unified simulator is the correct base
+
+The H1 unified simulator is the most appropriate base for H2 because it is the version that actually matches
+the research question of the paper: latency heterogeneity, HFT share, and post-shock instability.
+
+Compared with the clean original simulator, the H1 unified environment already includes the modeling choices
+needed for this paper:
+
+- trend-following chartists rather than the original contrarian `Chartist` behavior;
+- `speed_multiplier`, so fast agents can have an execution-speed advantage;
+- the same population constructor used in the final H1 grids;
+- safe handling of empty or partially depleted order books;
+- direct stability metrics (`vol_ratio`, `spread_ratio`, `max_drawdown`, `recovery_time`, `mm_panic_ratio`);
+- the same tipping rule and statistical testing used in H1.
+
+The point is not that H1 unified is a universally "true" market simulator. The point is that it is the internally
+consistent simulator for this paper. Therefore, H2 should be tested by changing only the clock mechanism inside
+this environment.
+
+The standalone H2 branch should be treated as a development prototype because its calendar baseline did not
+match H1. The H2-on-H1 version fixes that problem.
+
+### What changes for H2
+
+Only the timekeeping mechanism changes.
+
+Calendar mode:
+
+```text
+one recorded tick = one unified simulator iteration
+```
+
+Event-time mode:
+
+```text
+one recorded tick = repeated trading rounds until executed_volume_tick >= Vstar
+```
+
+### Volume units
+
+One volume unit means **one executed asset/share unit**.
+
+It is computed from matched order quantity:
+
+```text
+executed_qty = incoming_order_qty_before_matching - incoming_order_qty_after_matching
+```
+
+Examples:
+
+- a market buy of quantity 5 fully executed contributes `5`;
+- a market sell of quantity 3 partially executed for 2 contributes `2`;
+- a limit order posted to the book without execution contributes `0`;
+- a crossing limit order that executes quantity 4 contributes `4`.
+
+So `Vstar=13` means:
+
+```text
+finish the event-time tick after approximately 13 asset units have actually traded
+```
+
+Because the model executes whole trading rounds, realized event-time volume can overshoot `Vstar`.
+That is why the experiment records realized volume diagnostics.
+
+### Volume-clock implementation
+
+The experiment defines a local subclass:
+
+```text
+VolumeExchangeAgent(ExchangeAgent)
+```
+
+It keeps H1 exchange behavior but adds counters:
+
+```text
+executed_volume_tick
+executed_volume_total
+executed_trades_tick
+executed_trades_total
+```
+
+`limit_order()` and `market_order()` are overridden only to count matched quantity. They otherwise preserve
+the H1 order-book behavior.
+
+### Event-time simulator
+
+The experiment defines:
+
+```text
+SimulatorEventTimeUnified
+```
+
+Per event-time tick:
+
+1. apply scheduled events;
+2. call `exchange.record_state()`;
+3. capture `SimulatorInfo`;
+4. update chartist sentiment using the H1 unified dispatch logic;
+5. reset tick volume counter;
+6. repeatedly call fast agents first and slow agents after them until:
+
+```text
+executed_volume_tick >= Vstar
+```
+
+or until `max_sub_iters` is reached;
+
+7. pay dividends and interest once;
+8. generate the next dividend once.
+
+Payments are once per recorded tick, not once per inner trading round, to avoid mechanically changing the
+dividend/interest frequency.
+
+### Vstar calibration
+
+The final H2 run should use:
+
+```text
+--calibrate-vstar
+```
+
+Calibration rule:
+
+```text
+calendar_volume_per_tick =
+    mean(executed_volume_total / n_iter for calendar phi=0 runs)
+
+Vstar = round(calendar_volume_per_tick * multiplier)
+```
+
+Default multipliers:
+
+```text
+0.5, 1.0, 1.5
+```
+
+The experiment records:
+
+- `calendar_volume_per_tick_target`
+- `vstar_to_calendar_tick_ratio`
+- `executed_volume_total`
+- `avg_sub_iters`
+- `threshold_hit_rate`
+- `book_depleted_rate`
+
+### Output files
+
+Default output prefix:
+
+```text
+h2_unified_calibrated
+```
+
+Output files:
+
+```text
+h2_unified_calibrated_raw.csv
+h2_unified_calibrated_agg.csv
+h2_unified_calibrated_tipping.csv
+h2_unified_calibrated_stats.csv
+h2_unified_calibrated_metrics.png
+h2_unified_calibrated_heatmap.png
+h2_unified_calibrated_tipping.png
+```
+
+### Acceptance criteria
+
+The H2-on-H1 experiment is legitimate if:
+
+1. calendar mode approximately reproduces H1 unified `speed×2`;
+2. event-time differs only in the clock mechanism;
+3. `Vstar` is calibrated from calendar executed volume;
+4. `threshold_hit_rate` is high enough that event-time ticks usually reach their target;
+5. `book_depleted_rate` does not dominate the interpretation;
+6. conclusions are based on `phi*_calendar` vs `phi*_event_time`.
+
+### How to run
+
+Smoke test:
+
+```bash
+python3 experiment_h2_event_time_unified.py --runs 2 --n-iter 120 --shock-it 50 --hft-frac 0 0.5 --no-plots
+```
+
+Final candidate:
+
+```bash
+python3 experiment_h2_event_time_unified.py
+```
+
+Calendar-only sanity check:
+
+```bash
+python3 experiment_h2_event_time_unified.py --calendar-only --no-plots
+```
+
+High-activity sensitivity:
+
+```bash
+python3 experiment_h2_event_time_unified.py --no-calibrate-vstar --vstar 25 50 100 --output-prefix h2_unified_high_activity
+```
+
+### Completed final H2-on-H1 run
+
+The final calibrated H2-on-H1 run was executed with the default command:
+
+```bash
+python3 experiment_h2_event_time_unified.py
+```
+
+Because the full simulation successfully saved all CSV files but the process stopped during final plotting
+post-processing, plots were rebuilt from the saved raw file with:
+
+```bash
+python3 experiment_h2_event_time_unified.py --plot-from-raw
+```
+
+This second command does not rerun simulations. It recomputes aggregation, tipping, Mann-Whitney statistics,
+and PNG figures from `h2_unified_calibrated_raw.csv`.
+
+Final run size:
+
+```text
+calendar:   11 phi values × 30 runs = 330 simulations
+event-time: 3 Vstar values × 11 phi values × 30 runs = 990 simulations
+total:      1,320 simulations
+```
+
+The calibrated volume target was:
+
+```text
+calendar phi=0 average executed volume per tick = 12.915 volume units
+Vstar values = 6, 13, 19
+```
+
+Here one volume unit is one executed asset/share unit.
+
+#### Sanity check against H1
+
+The most important technical validation is that the calendar branch of H2-on-H1 reproduces the main H1 unified
+speed-only result:
+
+| Source | speed_multiplier | info_lag | baseline vol_ratio | phi* under 1.3× rule | max vol_ratio | phi at max |
+|---|---:|---:|---:|---:|---:|---:|
+| H1 unified Grid 1 | 2 | 0 | 1.746 | 0.2 | 3.392 | 0.4 |
+| H2-on-H1 calendar | 2 | 0 | 1.746 | 0.2 | 3.393 | 0.4 |
+
+This is why the final H2 experiment is considered legitimate: the control condition is not drifting away from
+the H1 result.
+
+#### H2-on-H1 tipping results
+
+| Regime | Clock | Vstar | baseline vol_ratio at phi=0 | 1.3× threshold | phi* | max vol_ratio | phi at max | Interpretation |
+|---|---|---:|---:|---:|---:|---:|---:|---|
+| `calendar` | calendar | — | 1.746 | 2.270 | 0.2 | 3.393 | 0.4 | reproduces H1 unified `speed×2` |
+| `event_time_V6` | event time | 6 | 2.444 | 3.177 | 0.6 | 3.357 | 0.9 | small volume tick raises baseline and delays tipping |
+| `event_time_V13` | event time | 13 | 1.971 | 2.563 | 0.2 | 3.851 | 0.8 | closest calibrated regime; phi* matches calendar |
+| `event_time_V19` | event time | 19 | 2.060 | 2.678 | 0.8 | 3.258 | 0.9 | larger volume tick delays tipping |
+
+#### Event-time diagnostics
+
+The event-time loop has two important diagnostics:
+
+- `threshold_hit_rate`: share of event-time ticks where the simulator actually reached `Vstar` before the
+  `max_sub_iters` safety cap;
+- `book_depleted_rate`: share of recorded ticks where the order book was depleted enough that price could not
+  be safely determined.
+
+Final diagnostic summary:
+
+| Regime | Vstar / calendar-volume ratio | mean inner trading rounds per tick | threshold_hit_rate | book_depleted_rate | mean executed volume per run |
+|---|---:|---:|---:|---:|---:|
+| `calendar` | — | 1.000 | 1.000 | 0.000 | 8,448 |
+| `event_time_V6` | 0.465 | 1.202 | 0.998 | 0.002 | 8,965 |
+| `event_time_V13` | 1.007 | 1.524 | 0.998 | 0.002 | 11,207 |
+| `event_time_V19` | 1.471 | 1.953 | 0.997 | 0.003 | 14,013 |
+
+These diagnostics support the technical validity of the run:
+
+- event-time ticks almost always reach their volume target;
+- order-book depletion is very rare and does not dominate the results;
+- larger `Vstar` mechanically creates more inner trading rounds per recorded tick and larger total executed
+  volume per run, so event-time results must be interpreted as a clock-scale sensitivity rather than a pure
+  stabilizing mechanism.
+
+#### Statistical check
+
+Mann-Whitney U tests compare each `phi > 0` against the same-regime `phi=0` baseline.
+
+Significant upward shifts in `vol_ratio`:
+
+| Regime | Significant phi values at p < 0.05 |
+|---|---|
+| `calendar` | 0.1, 0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0 |
+| `event_time_V6` | none |
+| `event_time_V13` | 0.2, 0.4, 0.5, 0.8, 0.9, 1.0 |
+| `event_time_V19` | 0.9, 1.0 |
+
+#### Interpretation of the H2 result
+
+The most important validation result is that the calendar branch now reproduces the main H1 unified speed-only
+result:
+
+```text
+H1 unified speed×2: phi* = 0.2, baseline ≈ 1.746
+H2-on-H1 calendar:  phi* = 0.2, baseline = 1.746
+```
+
+This fixes the earlier comparability problem from the standalone H2 branch. The H2 experiment is now testing
+the clock mechanism inside the same H1 market environment, rather than comparing two different model variants.
+
+The event-time results are conditional on the volume threshold:
+
+- at `Vstar=13`, which is almost exactly one calibrated calendar tick (`13 / 12.915 ≈ 1.01`), the tipping point
+  stays at `phi*=0.2`;
+- at `Vstar=6`, the baseline instability is already high (`2.444`), and the 1.3× tipping point moves later to
+  `phi*=0.6`;
+- at `Vstar=19`, the tipping point also moves later, to `phi*=0.8`.
+
+Therefore, this run does **not** support a universal claim that event-time always makes the market more robust.
+The cleaner conclusion is:
+
+> When the volume clock is calibrated to approximately the same executed volume as one calendar tick, the HFT
+> tipping point remains close to the H1 calendar result. Changing the event-time volume threshold can shift the
+> apparent tipping point, because it changes the effective trading intensity represented by one recorded tick.
+
+For the paper, H2 should be framed as a **clock-measurement robustness test** rather than a strong confirmation
+that event time mechanically stabilizes the market. The legitimate claim is that the H1 tipping result is not an
+artifact of a broken standalone H2 implementation: in the correctly ported H1 environment, calendar time matches
+the original H1 result, and event-time behavior depends on the chosen volume-clock scale.
+
+#### Final H2-on-H1 output files
+
+```text
+h2_unified_calibrated_raw.csv
+h2_unified_calibrated_agg.csv
+h2_unified_calibrated_tipping.csv
+h2_unified_calibrated_stats.csv
+h2_unified_calibrated_metrics.png
+h2_unified_calibrated_heatmap.png
+h2_unified_calibrated_tipping.png
+```
+
 ### Technical fix: plotting bug in `experiment_unified.py`
 
 During plotting, a `KeyError: 'drawdown'` was discovered.
