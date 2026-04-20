@@ -1279,6 +1279,367 @@ Purpose:
 
 This notebook is a presentation artifact, not part of the simulation pipeline.
 
+### Follow-up 7 / H3: Volatility clustering from delay and liquidity constraints (`experiment_h3_volatility_clustering.py`)
+
+#### Scientific purpose
+
+H3 is not primarily a tipping-point experiment. It tests a different mechanism:
+
+> Information delay and liquidity constraints jointly produce volatility clustering, and their combined effect may be stronger than the sum of the separate effects.
+
+In this context, **volatility clustering** means that large price movements tend to arrive in groups. If the market has a large absolute return now, it is more likely to have another large absolute return in the next few iterations. This is measured using autocorrelation of absolute returns.
+
+The key question is:
+
+> Does the combination of stale information and constrained liquidity make post-shock volatility more persistent?
+
+#### Why H3 is implemented on the H1 unified environment
+
+H3 should be run on the same H1 unified calendar-time environment, not on `main` and not on the H2 event-time clock.
+
+The fixed H1 environment gives:
+- trend-following `TrendChartist` / `SlowTrendChartist`,
+- `speed_multiplier`,
+- delayed information infrastructure,
+- direct H1 metrics,
+- safe order-book handling,
+- the same population constructor and shock setup used in the final H1 experiments.
+
+H2 event-time is intentionally not used here. Otherwise, the experiment would mix two hypotheses at once: clock representation and volatility clustering.
+
+#### Experimental design
+
+The experiment varies two H3 factors:
+
+1. **Information delay**
+   - `info_lag ∈ {0, 1, 3, 5, 10}`
+   - implemented through the H1 unified delayed-information logic.
+
+2. **Liquidity constraint**
+   - proxied by MarketMaker inventory bound `softlimit`
+   - `softlimit ∈ {20, 50, 100}`
+   - lower `softlimit` means tighter liquidity provision, because the market maker reaches inventory limits sooner and has less ability to absorb order-flow imbalance.
+
+The experiment also varies the HFT share:
+
+```text
+hft_frac ∈ {0.0, 0.2, 0.4, 0.6, 0.8, 1.0}
+```
+
+Fixed configuration:
+
+```text
+speed_multiplier = 2
+shock_it = 200
+shock_dp = -10
+n_iter = 500
+n_runs = 30
+calendar-time only
+population = 10 Fundamentalists + 10 TrendChartists + 5 Random + 1 MarketMaker
+```
+
+Default grid size:
+
+```text
+5 info_lag values × 3 softlimit values × 6 hft_frac values × 30 runs = 2,700 simulations
+```
+
+#### H3 metrics
+
+The experiment keeps the standard H1 metrics:
+
+- `vol_ratio`
+- `spread_ratio`
+- `max_drawdown`
+- `recovery_time`
+- `mm_panic_ratio`
+
+It adds clustering metrics based on price returns:
+
+```text
+r_t = (price_t - price_{t-1}) / price_{t-1}
+abs_return_t = |r_t|
+```
+
+Main H3 metrics:
+
+- `acf_abs_ret_1`
+  - `corr(|r_t|, |r_{t-1}|)` on the post-shock period
+  - short-run volatility persistence
+- `acf_abs_ret_5`
+  - `corr(|r_t|, |r_{t-5}|)` on the post-shock period
+  - longer memory in volatility
+- `vol_persistence`
+  - autocorrelation of rolling price-return volatility
+- `high_vol_cluster_share`
+  - share of post-shock rolling-volatility observations above the 90th percentile of pre-shock rolling volatility
+
+If these metrics rise, it means high-volatility states are becoming more persistent and clustered.
+
+#### Interaction effect
+
+H3 is specifically about the **combined** effect of delay and liquidity constraints. For each `hft_frac`, `info_lag`, `softlimit`, and metric, the script computes:
+
+```text
+interaction =
+    metric(delay + tight liquidity)
+  - metric(delay only)
+  - metric(tight liquidity only)
+  + metric(baseline)
+```
+
+where:
+
+```text
+baseline              = info_lag=0, softlimit=100
+delay only            = info_lag>0, softlimit=100
+tight liquidity only  = info_lag=0, softlimit<100
+combined              = info_lag>0, softlimit<100
+```
+
+Interpretation:
+
+- `interaction > 0`: the combined effect is stronger than the sum of separate effects; this supports H3.
+- `interaction ≈ 0`: delay and liquidity constraints are mostly additive.
+- `interaction < 0`: the combined regime does not amplify clustering beyond separate effects.
+
+#### Output files
+
+Default output prefix:
+
+```text
+h3_clustering
+```
+
+Output files:
+
+```text
+h3_clustering_raw.csv
+h3_clustering_agg.csv
+h3_clustering_interactions.csv
+h3_clustering_metrics.png
+h3_clustering_heatmap_acf1.png
+h3_clustering_heatmap_interaction.png
+```
+
+#### How to run
+
+Smoke test:
+
+```bash
+python3 experiment_h3_volatility_clustering.py --runs 2 --n-iter 120 --shock-it 50 --hft-frac 0 0.4 --info-lag 0 3 --softlimit 20 100 --no-plots
+```
+
+Final run:
+
+```bash
+python3 experiment_h3_volatility_clustering.py
+```
+
+Rebuild plots from existing raw results without rerunning simulations:
+
+```bash
+python3 experiment_h3_volatility_clustering.py --plot-from-raw
+```
+
+#### Expected interpretation
+
+H3 is supported if:
+
+- `acf_abs_ret_1` and/or `acf_abs_ret_5` increase with `info_lag`;
+- clustering metrics increase when `softlimit` becomes tighter;
+- interaction terms are positive, especially for tight liquidity (`softlimit=20`) and larger delays (`lag=5` or `lag=10`);
+- the result is visible not only in `vol_ratio`, but also in persistence metrics.
+
+If interaction terms are weak or negative, the correct conclusion is not that the experiment failed, but that:
+
+> Information delay and liquidity constraints may affect instability separately, but the evidence for superadditive volatility clustering is weak in this ABM configuration.
+
+#### Completed H3 run
+
+The full H3 grid was run with the default command:
+
+```bash
+python3 experiment_h3_volatility_clustering.py
+```
+
+Run completeness:
+
+```text
+raw rows = 2,700
+aggregated rows = 90
+interaction rows = 48
+runs per parameter cell = 30
+missing values in key metrics = 0
+```
+
+This matches the planned grid:
+
+```text
+5 info_lag values × 3 softlimit values × 6 hft_frac values × 30 runs = 2,700 simulations
+```
+
+Output files:
+
+```text
+h3_clustering_raw.csv
+h3_clustering_agg.csv
+h3_clustering_interactions.csv
+h3_clustering_metrics.png
+h3_clustering_heatmap_acf1.png
+h3_clustering_heatmap_interaction.png
+```
+
+Raw metric ranges:
+
+| metric | min | max | mean |
+|---|---:|---:|---:|
+| `vol_ratio` | 0.379 | 11.651 | 2.307 |
+| `spread_ratio` | 0.319 | 19.885 | 2.424 |
+| `max_drawdown` | 0.002 | 1.071 | 0.253 |
+| `recovery_time` | 0.000 | 300.000 | 39.033 |
+| `mm_panic_ratio` | 0.000 | 1.000 | 0.992 |
+| `acf_abs_ret_1` | 0.001 | 0.732 | 0.321 |
+| `acf_abs_ret_5` | -0.080 | 0.546 | 0.173 |
+| `vol_persistence` | 0.895 | 0.989 | 0.963 |
+| `high_vol_cluster_share` | 0.000 | 1.000 | 0.414 |
+
+Sanity interpretation:
+- all key metrics were computed for every raw run;
+- `acf_abs_ret_1` is positive in all runs, which means short-run volatility persistence is a systematic feature of these post-shock trajectories;
+- `acf_abs_ret_5` can be slightly negative in individual runs, so longer-memory clustering is less mechanically guaranteed;
+- `vol_persistence` is high in all regimes, so the useful comparison is the relative change across grid cells, not the absolute fact that it is positive.
+
+Main aggregate pattern by information delay:
+
+| info_lag | mean acf_abs_ret_1 | mean acf_abs_ret_5 | mean vol_persistence | mean high_vol_cluster_share | mean vol_ratio |
+|---:|---:|---:|---:|---:|---:|
+| 0  | 0.298 | 0.151 | 0.960 | 0.376 | 2.151 |
+| 1  | 0.362 | 0.173 | 0.964 | 0.418 | 2.305 |
+| 3  | 0.320 | 0.188 | 0.965 | 0.408 | 2.291 |
+| 5  | 0.314 | 0.184 | 0.964 | 0.425 | 2.351 |
+| 10 | 0.311 | 0.168 | 0.963 | 0.442 | 2.437 |
+
+Interpretation:
+- information delay increases volatility clustering relative to `lag=0`;
+- the strongest short-run absolute-return autocorrelation is at `lag=1`;
+- longer delays increase the share of high-volatility post-shock periods and the overall `vol_ratio`;
+- delay therefore appears to be a real source of volatility persistence, but the effect is not monotone in every clustering metric.
+
+Main aggregate pattern by MarketMaker softlimit:
+
+| softlimit | mean acf_abs_ret_1 | mean acf_abs_ret_5 | mean vol_persistence | mean high_vol_cluster_share | mean vol_ratio | mean mm_panic_ratio |
+|---:|---:|---:|---:|---:|---:|---:|
+| 20  | 0.324 | 0.177 | 0.964 | 0.355 | 1.901 | 1.000 |
+| 50  | 0.320 | 0.169 | 0.963 | 0.395 | 2.196 | 0.999 |
+| 100 | 0.319 | 0.172 | 0.963 | 0.492 | 2.824 | 0.976 |
+
+Interpretation:
+- tighter inventory limits (`softlimit=20`) do not produce the largest volatility amplification in this implementation;
+- the market maker is almost always in panic at `softlimit=20`, but the highest `vol_ratio` and high-volatility cluster share appear at `softlimit=100`;
+- therefore, the MarketMaker `softlimit` parameter should not be interpreted mechanically as "lower softlimit always means more volatile market";
+- in this ABM, very tight market-maker constraints can change the trading regime rather than simply amplifying volatility.
+
+Top regimes by `acf_abs_ret_1`:
+
+| info_lag | softlimit | hft_frac | acf_abs_ret_1 | acf_abs_ret_5 | vol_persistence | high_vol_cluster_share | vol_ratio |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 20  | 0.0 | 0.500 | 0.235 | 0.972 | 0.368 | 1.849 |
+| 1 | 100 | 0.0 | 0.439 | 0.179 | 0.966 | 0.564 | 2.664 |
+| 1 | 20  | 0.2 | 0.438 | 0.207 | 0.968 | 0.370 | 1.912 |
+| 1 | 50  | 0.0 | 0.431 | 0.185 | 0.966 | 0.350 | 1.901 |
+| 1 | 20  | 0.4 | 0.416 | 0.195 | 0.969 | 0.252 | 1.494 |
+
+Top regimes by high-volatility cluster share:
+
+| info_lag | softlimit | hft_frac | acf_abs_ret_1 | vol_persistence | high_vol_cluster_share | vol_ratio |
+|---:|---:|---:|---:|---:|---:|---:|
+| 10 | 100 | 0.4 | 0.323 | 0.968 | 0.592 | 3.456 |
+| 1  | 100 | 0.0 | 0.439 | 0.966 | 0.564 | 2.664 |
+| 5  | 100 | 0.6 | 0.333 | 0.967 | 0.561 | 3.206 |
+| 3  | 100 | 0.8 | 0.301 | 0.961 | 0.561 | 3.225 |
+| 1  | 100 | 0.6 | 0.358 | 0.964 | 0.559 | 3.141 |
+
+Top positive interaction terms for `acf_abs_ret_1`:
+
+| info_lag | softlimit | hft_frac | interaction_acf_abs_ret_1 | interaction_acf_abs_ret_5 | interaction_vol_persistence | interaction_high_vol_cluster_share | interaction_vol_ratio |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 5  | 50 | 0.2 | 0.064 | 0.028 | 0.005 | -0.004 | 0.073 |
+| 10 | 50 | 0.6 | 0.052 | 0.086 | 0.009 | -0.011 | 0.062 |
+| 3  | 50 | 0.6 | 0.046 | 0.051 | 0.008 | -0.080 | -0.451 |
+| 3  | 50 | 0.4 | 0.046 | -0.013 | 0.003 | -0.024 | -0.526 |
+| 1  | 20 | 0.0 | 0.045 | 0.055 | 0.008 | -0.039 | -0.393 |
+
+Most negative interaction terms for `acf_abs_ret_1`:
+
+| info_lag | softlimit | hft_frac | interaction_acf_abs_ret_1 | interaction_acf_abs_ret_5 | interaction_vol_persistence | interaction_high_vol_cluster_share | interaction_vol_ratio |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 3  | 20 | 0.2 | -0.068 | -0.105 | -0.007 | -0.180 | -0.889 |
+| 1  | 50 | 0.0 | -0.062 | 0.005 | -0.003 | -0.170 | -0.675 |
+| 5  | 20 | 0.2 | -0.059 | -0.090 | -0.007 | -0.118 | -0.685 |
+| 3  | 50 | 0.0 | -0.054 | -0.030 | -0.005 | -0.093 | -0.679 |
+| 10 | 20 | 0.2 | -0.050 | -0.120 | -0.009 | -0.199 | -0.945 |
+
+Share of positive interaction terms:
+
+| interaction metric | positive share | mean interaction | min | max |
+|---|---:|---:|---:|---:|
+| `interaction_acf_abs_ret_1` | 37.5% | -0.006 | -0.068 | 0.064 |
+| `interaction_acf_abs_ret_5` | 29.2% | -0.017 | -0.120 | 0.086 |
+| `interaction_vol_persistence` | 54.2% | -0.000 | -0.011 | 0.009 |
+| `interaction_high_vol_cluster_share` | 33.3% | -0.030 | -0.199 | 0.163 |
+| `interaction_vol_ratio` | 25.0% | -0.266 | -1.197 | 0.947 |
+
+This table is the main reason the final H3 conclusion must be cautious:
+- some cells have positive superadditive interaction;
+- however, positive interactions are not the majority for `acf_abs_ret_1`, `acf_abs_ret_5`, `high_vol_cluster_share`, or `vol_ratio`;
+- mean interaction is close to zero or negative for the main H3 metrics;
+- therefore, H3 is not supported as a universal superadditive mechanism.
+
+#### Plot interpretation
+
+The generated plots should be read as follows:
+
+- `h3_clustering_metrics.png`
+  - compares the main H3 and H1 metrics across `hft_frac`;
+  - lines are separated by `softlimit`;
+  - panels are separated by `info_lag`;
+  - useful for seeing that delay changes clustering, but the effect is not a simple monotone function of `hft_frac`.
+- `h3_clustering_heatmap_acf1.png`
+  - heatmap of `acf_abs_ret_1`;
+  - useful for locating the strongest short-run volatility clustering regimes;
+  - highest values concentrate around `lag=1`, especially with low or moderate `hft_frac`.
+- `h3_clustering_heatmap_interaction.png`
+  - heatmap of the interaction term for `acf_abs_ret_1`;
+  - useful for checking the superadditivity claim;
+  - mixed signs in this plot support the "regime-dependent / weakly superadditive" interpretation.
+
+Final H3 interpretation:
+
+- H3 receives **partial support**.
+- The delay part is supported: delayed information increases post-shock volatility persistence and clustering relative to `lag=0`.
+- The superadditive interaction part is weaker: some positive interactions exist, especially for `softlimit=50`, but they are small and not consistently positive across all clustering metrics.
+- The strongest volatility amplification appears under high-liquidity-capacity regimes (`softlimit=100`), not under the tightest inventory constraint (`softlimit=20`).
+- Therefore, the paper should not claim that "delay + tight liquidity always creates stronger clustering." A safer claim is:
+
+> In the H1 unified ABM environment, information delay increases volatility clustering after a shock. The interaction with market-maker liquidity constraints is regime-dependent and only weakly superadditive in selected cells.
+
+Paper-safe conclusion:
+
+> The H3 experiment shows that information delay is associated with stronger post-shock volatility clustering: compared with `lag=0`, delayed regimes have higher short-run absolute-return autocorrelation, higher high-volatility cluster share, and higher average `vol_ratio`. However, the interaction between delay and market-maker liquidity constraints is not uniformly positive. The evidence therefore supports the delay-to-clustering mechanism, but only weakly supports the stronger superadditive claim that delay and tight liquidity constraints jointly amplify clustering beyond their separate effects.
+
+Limitations:
+- H3 uses `softlimit` as a proxy for liquidity constraints; this is meaningful but imperfect, because very low `softlimit` can alter the trading regime rather than simply reducing liquidity depth.
+- The interaction terms are computed on aggregated cell means; no separate statistical test of the interaction distribution has been added yet.
+- `mm_panic_ratio` is near one in many regimes, so it is more useful as a diagnostic than as a fine-grained dependent variable here.
+- The current result should be treated as a mechanism check and robustness extension, not as a clean tipping-point result like the strongest H1 speed-only regime.
+
+Optional follow-up if stronger H3 evidence is needed:
+- add a permutation/bootstrap confidence interval for each interaction term;
+- test alternative liquidity proxies such as initial book depth or market-maker count;
+- run a smaller focused grid around `softlimit=50`, where the strongest positive interaction terms appeared;
+- compare clustering metrics before and after shock within each regime using paired run-level statistics.
+
 ### Technical fix: plotting bug in `experiment_unified.py`
 
 During plotting, a `KeyError: 'drawdown'` was discovered.
