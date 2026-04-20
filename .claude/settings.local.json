@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3)",
+      "Bash(git -C \"/Users/arinaravilova/Desktop/course paper/1D-ABM\" branch -a)",
+      "Bash(python3 -)"
+    ]
+  }
+}

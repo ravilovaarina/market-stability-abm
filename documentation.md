@@ -1289,3 +1289,234 @@ instability pattern is not primarily an artifact of the calendar clock.
 ```
 
 This is still useful for the paper because it strengthens H1: the tipping behavior is not simply caused by counting time in calendar iterations.
+
+---
+
+## H2 Improved: Post-Shock Volume-Window Comparison
+
+### Motivation
+
+The previous H2-clean experiment matched calendar-time and event-time runs by **total executed volume**. This was already cleaner than comparing raw calendar ticks, but an additional concern remained:
+
+```text
+The shock changes trading intensity, so total-volume matching may still mix
+pre-shock and post-shock activity in a way that blurs the actual H2 question.
+```
+
+The improved H2 experiment follows the external review suggestion and compares **equal executed-volume windows after the shock**.
+
+### Scientific Question
+
+The improved H2 question is:
+
+```text
+After matching the amount of post-shock trading activity,
+does event time produce lower realized volatility than calendar time?
+```
+
+This is stricter than the previous H2-clean test because it controls the exact post-shock exposure that is most relevant for market instability.
+
+### Architecture
+
+The experiment is implemented as:
+
+```text
+experiment_h2_postshock_volume_windows.py
+```
+
+For each `(run, hft_frac)` pair:
+
+1. Run the calendar-time simulation with fixed `n_ticks=500`.
+2. Trigger the shock at `shock_tick=200`.
+3. Measure calendar post-shock executed volume:
+
+```text
+calendar_post_volume = executed volume from tick 200 to the end
+```
+
+4. Calibrate the event-time volume threshold from the calendar post-shock trading rate:
+
+```text
+Vstar = round(calendar_post_volume / number_of_post_shock_ticks)
+```
+
+This means `Vstar` is matched to the **post-shock** calendar trading rate, not the pre-shock average.
+
+5. Rerun the same seed in event time with this `Vstar`.
+6. Compare calendar and event-time metrics on the same target post-shock executed-volume window.
+
+### Metrics
+
+Primary metrics:
+
+- `post_rv_per_volume`
+  - sum of squared returns in the post-shock volume window divided by executed volume;
+- `post_rv_per_trade`
+  - sum of squared returns divided by the number of executed trades;
+- `post_vol_per_sqrt_volume`
+  - standard deviation of returns divided by square root of executed volume.
+
+Context metrics:
+
+- `equal_volume_vol_ratio`
+  - post/pre realized variance per volume ratio using volume-matched windows;
+- `post_window_volume`
+- `post_window_trades`
+- `threshold_hit_rate`
+- `avg_sub_iters`
+- `book_depleted_rate`
+
+### Interpretation Rule
+
+H2 receives support if event time systematically lowers post-shock realized volatility after controlling for post-shock executed volume:
+
+```text
+event_time - calendar_time < 0
+```
+
+especially for:
+
+```text
+post_rv_per_volume
+post_rv_per_trade
+post_vol_per_sqrt_volume
+```
+
+If the paired differences are close to zero or confidence intervals include zero, the correct conclusion remains:
+
+```text
+Event time changes how activity is represented, but does not materially
+stabilize the market once post-shock trading exposure is controlled.
+```
+
+### Completed H2 Improved Run
+
+The improved post-shock volume-window experiment was run with:
+
+```bash
+python3 experiment_h2_postshock_volume_windows.py
+```
+
+Run completeness:
+
+```text
+raw rows = 400
+aggregated rows = 8
+paired-difference rows = 200
+difference-summary rows = 4
+runs per mode x hft_frac cell = 50
+```
+
+Output files:
+
+```text
+h2_postshock_volume_raw.csv
+h2_postshock_volume_agg.csv
+h2_postshock_volume_paired_diffs.csv
+h2_postshock_volume_diff_summary.csv
+h2_postshock_volume_metrics.png
+h2_postshock_volume_diffs.png
+```
+
+### Diagnostics
+
+The event-time threshold was calibrated from post-shock calendar volume per tick:
+
+| `hft_frac` | mean `Vstar` |
+|---:|---:|
+| 0.0 | 12.70 |
+| 0.2 | 13.84 |
+| 0.4 | 15.28 |
+| 0.6 | 17.02 |
+
+Threshold diagnostics:
+
+| Mode | `hft_frac` | threshold hit rate | avg sub-iterations | book depleted rate |
+|---|---:|---:|---:|---:|
+| calendar | 0.0 | 1.0 | 1.000 | 0.0 |
+| calendar | 0.2 | 1.0 | 1.000 | 0.0 |
+| calendar | 0.4 | 1.0 | 1.000 | 0.0 |
+| calendar | 0.6 | 1.0 | 1.000 | 0.0 |
+| event_time | 0.0 | 1.0 | 1.676 | 0.0 |
+| event_time | 0.2 | 1.0 | 1.623 | 0.0 |
+| event_time | 0.4 | 1.0 | 1.614 | 0.0 |
+| event_time | 0.6 | 1.0 | 1.609 | 0.0 |
+
+Interpretation:
+
+- event-time ticks reliably reach the calibrated post-shock volume threshold;
+- there is no order-book depletion in this run;
+- event-time uses about 1.6 trading rounds per tick on average, which means the clock transformation is operational rather than only cosmetic.
+
+### Aggregated Primary Metrics
+
+| Mode | `hft_frac` | post RV / volume | post RV / trade | post vol / sqrt(volume) | equal-volume vol ratio | post-window volume | target post volume |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| calendar | 0.0 | 0.000049 | 0.000157 | 0.000373 | 4.250 | 3793.50 | 3805.38 |
+| calendar | 0.2 | 0.000044 | 0.000141 | 0.000346 | 4.284 | 4124.46 | 4138.38 |
+| calendar | 0.4 | 0.000074 | 0.000247 | 0.000434 | 7.010 | 4565.90 | 4580.88 |
+| calendar | 0.6 | 0.000081 | 0.000269 | 0.000471 | 7.233 | 5075.24 | 5093.38 |
+| event_time | 0.0 | 0.000034 | 0.000106 | 0.000377 | 4.006 | 3815.58 | 3805.38 |
+| event_time | 0.2 | 0.000056 | 0.000183 | 0.000477 | 5.596 | 4150.14 | 4138.38 |
+| event_time | 0.4 | 0.000060 | 0.000194 | 0.000480 | 5.184 | 4590.34 | 4580.88 |
+| event_time | 0.6 | 0.000070 | 0.000230 | 0.000549 | 5.120 | 5103.90 | 5093.38 |
+
+Post-window volume matching is close:
+
+| `hft_frac` | calendar mean error | event-time mean error |
+|---:|---:|---:|
+| 0.0 | -11.88 | 10.20 |
+| 0.2 | -13.92 | 11.76 |
+| 0.4 | -14.98 | 9.46 |
+| 0.6 | -18.14 | 10.52 |
+
+The small errors come from discrete trade sizes: the script cannot stop inside a partially executed trade.
+
+### Paired Event-Time Minus Calendar-Time Differences
+
+Negative values mean event time produced lower post-shock volatility than calendar time.
+
+| `hft_frac` | Δ post RV / volume | 95% CI | Δ post RV / trade | 95% CI | Δ post vol / sqrt(volume) | 95% CI |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0.0 | -0.000016 | [-0.000033, 0.000001] | -0.000051 | [-0.000108, 0.000004] | 0.000004 | [-0.000071, 0.000078] |
+| 0.2 | 0.000012 | [-0.000011, 0.000040] | 0.000041 | [-0.000037, 0.000135] | 0.000130 | [0.000041, 0.000235] |
+| 0.4 | -0.000014 | [-0.000045, 0.000017] | -0.000052 | [-0.000162, 0.000056] | 0.000045 | [-0.000056, 0.000147] |
+| 0.6 | -0.000011 | [-0.000038, 0.000016] | -0.000039 | [-0.000130, 0.000051] | 0.000077 | [-0.000008, 0.000164] |
+
+Equal-volume volatility ratio differences:
+
+| `hft_frac` | Δ equal-volume vol ratio | 95% CI |
+|---:|---:|---:|
+| 0.0 | -0.244 | [-1.764, 1.346] |
+| 0.2 | 1.312 | [-1.222, 3.880] |
+| 0.4 | -1.825 | [-6.291, 1.894] |
+| 0.6 | -2.112 | [-6.466, 0.888] |
+
+### Improved H2 Interpretation
+
+This improved experiment again does **not** support a strong stabilizing effect of event time.
+
+Main points:
+
+- `post_rv_per_volume` has confidence intervals crossing zero for all `hft_frac`;
+- `post_rv_per_trade` also has confidence intervals crossing zero for all `hft_frac`;
+- `post_vol_per_sqrt_volume` is positive at `hft_frac=0.2`, which goes against a universal stabilization claim;
+- equal-volume volatility-ratio differences are noisy and all confidence intervals include zero;
+- diagnostics are clean: threshold hit rate is 1.0 and book depletion is 0.0.
+
+Final H2-improved conclusion:
+
+```text
+Even after calibrating Vstar from post-shock calendar volume and comparing
+equal post-shock executed-volume windows, event time does not materially reduce
+post-shock realized volatility in this ABM configuration.
+```
+
+This strengthens the final H2 interpretation:
+
+```text
+H2 is not confirmed as "event time stabilizes markets".
+The supported claim is weaker: H1 results are not merely an artifact of using
+calendar-time ticks, because the instability pattern persists under stricter
+volume-aware comparisons.
+```
