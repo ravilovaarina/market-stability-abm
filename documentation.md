@@ -1991,26 +1991,265 @@ Top positive ACF interactions after bootstrap:
 | `acf_abs_ret_5` | 1 | 300 | 0.2 | 0.054 | [-0.024, 0.121] | 0.150 | no |
 
 Bootstrap interpretation:
-- the clean-depth experiment improves the H3 interaction evidence relative to the softlimit experiment;
-- the share of positive `acf_abs_ret_1` interactions rises from 37.5% in the softlimit design to 55.6% in the depth design;
-- two positive ACF interactions have bootstrap CIs excluding zero, both involving the thinnest book (`book_volume=300`);
-- however, most interaction CIs still include zero, so the superadditive interaction claim is still not strongly confirmed.
+- the clean-depth experiment is methodologically stronger than the softlimit experiment because `book_volume` is a cleaner liquidity-depth proxy than MarketMaker `softlimit`;
+- the delay leg is clearly visible: `acf_abs_ret_1` rises from `0.297` at `lag=0` to `0.414` at `lag=1`;
+- the thin-book leg exists, but it is modest: `acf_abs_ret_1` is `0.374` at `book_volume=300` versus `0.342` at `book_volume=1500`, roughly a 10% difference across a 5x depth range;
+- the superadditive interaction is **not statistically supported as a systematic pattern**;
+- for the two main ACF clustering metrics, bootstrap CIs exclude zero in only one positive cell each:
+  - `acf_abs_ret_1`: 1 positive cell out of 36;
+  - `acf_abs_ret_5`: 1 positive cell out of 36;
+- both positive ACF cells are concentrated in one corner of the grid (`book_volume=300`, `info_lag=5`);
+- negative significant cells also appear, including 3 negative CIs for `high_vol_cluster_share`;
+- therefore, the interaction result is best interpreted as noise-level / isolated-cell evidence, not as confirmation of H3.
 
 Final H3-clean interpretation:
 
 - H3-clean gives **stronger support for the delay-to-clustering mechanism** than the first softlimit-H3 run.
-- It gives **limited but nonzero support** for the delay × thin-book interaction:
-  - the thinnest book has the highest mean ACF clustering metrics;
-  - some positive ACF interaction cells survive bootstrap;
-  - but the interaction effect is not broad or universal across all `phi`, `lag`, and `book_volume` cells.
+- H3-clean does **not** confirm the full H3 superadditivity claim.
+- The safest decomposition is:
+  - **delay leg:** supported;
+  - **thin-book leg:** weak but present in ACF metrics;
+  - **delay × thin-book interaction:** not supported as a systematic effect.
+- The current data cannot distinguish a very weak true interaction from a null interaction, because the run has only 30 simulations per cell and interaction estimates are small relative to bootstrap uncertainty.
 - The best paper-safe conclusion is:
 
-> Using initial order-book depth as a cleaner liquidity proxy, delayed information is again associated with stronger post-shock volatility clustering. Thin books increase ACF-based clustering metrics, and selected thin-book interaction cells show positive bootstrap-supported effects. However, the interaction is not universal, so H3 is supported as a conditional mechanism rather than as a general law.
+> Using initial order-book depth as a cleaner liquidity proxy, information delay is associated with stronger post-shock volatility clustering: `acf_abs_ret_1` rises from about 0.30 at `lag=0` to about 0.41 at `lag=1`. Thinner books weakly increase ACF-based clustering, but the superadditive delay x thin-book interaction is not statistically supported: across 36 interaction cells, bootstrap confidence intervals exclude zero in only one positive cell for `acf_abs_ret_1` and one positive cell for `acf_abs_ret_5`, both concentrated at the thinnest book and `lag=5`. We therefore report H3 as conditionally supported for the delay mechanism only, while the joint delay x illiquidity amplification predicted by the full H3 is not detectable in the current design.
 
 Paper positioning:
 - use the original softlimit-H3 as a cautionary robustness check showing that MarketMaker `softlimit` is an imperfect liquidity proxy;
 - use H3-clean as the main H3 result;
-- state that the evidence is strongest for ACF-based clustering metrics, not for pre-shock-normalized ratio metrics.
+- state that the evidence is strongest for ACF-based clustering metrics, not for pre-shock-normalized ratio metrics;
+- do **not** write that H3 is confirmed;
+- write that H3 receives partial support only through the delay-to-clustering channel.
+
+#### Final H3 Verdict Across Both H3 Experiments
+
+The two H3 implementations should be read together:
+
+1. **Softlimit-H3 (`experiment_h3_volatility_clustering.py`)**
+   - valid as an exploratory mechanism test;
+   - weakens the original liquidity story because `softlimit=20` saturates MarketMaker panic (`mm_panic_ratio = 1.000`);
+   - shows that delay affects clustering, but does not show a reliable superadditive interaction.
+
+2. **H3-clean / depth-H3 (`experiment_h3_liquidity_depth.py`)**
+   - methodologically cleaner because it changes initial order-book depth while keeping MarketMaker `softlimit=100`;
+   - confirms that information delay raises volatility clustering, especially at `lag=1`;
+   - shows a small thin-book ACF effect;
+   - still does not provide systematic bootstrap support for the interaction term.
+
+Final status:
+
+| H3 component | Status | Evidence |
+|---|---|---|
+| Delay increases volatility clustering | supported | `acf_abs_ret_1` rises from 0.297 to 0.414 at `lag=1` in H3-clean |
+| Thinner books increase clustering | weak support | `acf_abs_ret_1` is 0.374 at `book_volume=300` vs 0.342 at `book_volume=1500` |
+| Delay x liquidity superadditivity | not supported | positive bootstrap CI in only 1/36 ACF1 cells and 1/36 ACF5 cells; confirmatory 2x2 OLS CIs include zero for both ACF metrics |
+| Full H3 confirmation | no | interaction evidence is isolated and mixed-sign |
+
+Final paper-safe wording:
+
+> H3 receives partial support only for the information-delay mechanism. Delayed information increases post-shock volatility clustering, and thinner books weakly raise ACF-based clustering metrics. However, the predicted superadditive amplification from combining delay with illiquidity is not statistically supported in either the exploratory H3-clean grid or the focused 2x2 confirmatory experiment. The result should be reported as a negative/null finding for the full interaction hypothesis, not as confirmation of H3.
+
+#### Confirmatory Follow-up Design
+
+To test the interaction more directly, the final follow-up uses a focused 2x2 confirmatory design:
+
+```text
+hft_frac ∈ {0.2, 0.4}
+info_lag ∈ {0, 1}
+book_volume ∈ {300, 1500}
+n_runs = 200 per cell
+```
+
+Rationale:
+
+- `lag=1` is where the delay effect is strongest for `acf_abs_ret_1`;
+- `book_volume=300` vs `1500` gives the largest clean liquidity-depth contrast;
+- `hft_frac=0.2` and `0.4` focus on the central H1 regime instead of extreme endpoints;
+- 200 runs per cell would give much more power for the interaction term than the current 30-run grid.
+
+Recommended model for the confirmatory result:
+
+```text
+metric ~ delay + thin_book + delay:thin_book + run fixed effects
+```
+
+with HC3 robust standard errors or an equivalent bootstrap over runs.
+
+Interpretation rule:
+
+- if `delay:thin_book > 0` and statistically stable for `acf_abs_ret_1` / `acf_abs_ret_5`, H3 interaction receives focused support;
+- if not, the paper can cleanly state that the full superadditive H3 mechanism is not supported in this ABM configuration.
+
+#### H3 Confirmatory 2x2 Experiment Plan
+
+The confirmatory experiment is implemented as:
+
+```text
+experiment_h3_confirmatory_2x2.py
+```
+
+Purpose:
+
+```text
+Test the H3 interaction directly in the strongest and cleanest part of the grid,
+instead of scanning many exploratory cells.
+```
+
+Design:
+
+| Factor | Values | Meaning |
+|---|---:|---|
+| `hft_frac` | `{0.2, 0.4}` | central H1 regimes |
+| `info_lag` | `{0, 1}` | no delay vs strongest short-run delay effect |
+| `book_volume` | `{300, 1500}` | thin vs deep order book |
+| `n_runs` | `200` per cell | higher power than the 30-run exploratory grid |
+
+Total planned simulations:
+
+```text
+2 hft_frac values x 2 delay values x 2 book-depth values x 200 runs = 1,600 simulations
+```
+
+Baseline cell:
+
+```text
+info_lag = 0
+book_volume = 1500
+```
+
+Treatment definitions:
+
+```text
+delay = 1 if info_lag=1, else 0
+thin_book = 1 if book_volume=300, else 0
+interaction = delay x thin_book
+```
+
+The main confirmatory metrics are:
+
+- `acf_abs_ret_1`
+- `acf_abs_ret_5`
+
+Context metrics:
+
+- `high_vol_cluster_share`
+- `vol_ratio`
+- `vol_persistence`
+
+The script reports two interaction estimates:
+
+1. **Cell-mean factorial interaction**
+
+```text
+combined - delay_only - thin_book_only + baseline
+```
+
+2. **OLS interaction coefficient with run fixed effects**
+
+```text
+metric ~ delay + thin_book + delay:thin_book + run fixed effects
+```
+
+The OLS coefficient on `delay:thin_book` is the confirmatory estimate. HC3 robust standard errors are used to avoid relying on homoskedastic residuals.
+
+Interpretation:
+
+- positive and stable `delay:thin_book` for `acf_abs_ret_1` / `acf_abs_ret_5` supports the full H3 interaction;
+- insignificant or mixed-sign interaction means H3 remains supported only through the delay mechanism, not through superadditive delay x illiquidity amplification.
+
+#### Completed H3 Confirmatory 2x2 Run
+
+The confirmatory experiment was run with:
+
+```bash
+python3 experiment_h3_confirmatory_2x2.py
+```
+
+Run completeness:
+
+```text
+raw rows = 1,600
+aggregated rows = 8
+cell interaction rows = 10
+run-level interaction rows = 400
+OLS rows = 10
+runs per parameter cell = 200
+```
+
+This exactly matches the planned grid:
+
+```text
+2 hft_frac values x 2 info_lag values x 2 book_volume values x 200 runs = 1,600 simulations
+```
+
+Output files:
+
+```text
+h3_confirmatory_raw.csv
+h3_confirmatory_agg.csv
+h3_confirmatory_cell_interactions.csv
+h3_confirmatory_run_interactions.csv
+h3_confirmatory_ols_hc3.csv
+h3_confirmatory_metrics.png
+h3_confirmatory_interactions.png
+```
+
+Main cell means:
+
+| `hft_frac` | `info_lag` | `book_volume` | `acf_abs_ret_1` | `acf_abs_ret_5` | `high_vol_cluster_share` | `vol_ratio` |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0.2 | 0 | 300  | 0.323 | 0.158 | 0.403 | 2.553 |
+| 0.2 | 0 | 1500 | 0.300 | 0.173 | 0.433 | 2.278 |
+| 0.2 | 1 | 300  | 0.453 | 0.197 | 0.406 | 2.428 |
+| 0.2 | 1 | 1500 | 0.426 | 0.182 | 0.519 | 2.679 |
+| 0.4 | 0 | 300  | 0.307 | 0.173 | 0.367 | 2.532 |
+| 0.4 | 0 | 1500 | 0.288 | 0.158 | 0.486 | 2.725 |
+| 0.4 | 1 | 300  | 0.404 | 0.170 | 0.437 | 2.664 |
+| 0.4 | 1 | 1500 | 0.373 | 0.183 | 0.543 | 3.006 |
+
+Cell-mean factorial interactions:
+
+| `hft_frac` | metric | baseline | delay only | thin book only | combined | interaction |
+|---:|---|---:|---:|---:|---:|---:|
+| 0.2 | `acf_abs_ret_1` | 0.300 | 0.426 | 0.323 | 0.453 | 0.004 |
+| 0.2 | `acf_abs_ret_5` | 0.173 | 0.182 | 0.158 | 0.197 | 0.030 |
+| 0.2 | `high_vol_cluster_share` | 0.433 | 0.519 | 0.403 | 0.406 | -0.082 |
+| 0.2 | `vol_ratio` | 2.278 | 2.679 | 2.553 | 2.428 | -0.525 |
+| 0.4 | `acf_abs_ret_1` | 0.288 | 0.373 | 0.307 | 0.404 | 0.012 |
+| 0.4 | `acf_abs_ret_5` | 0.158 | 0.183 | 0.173 | 0.170 | -0.027 |
+| 0.4 | `high_vol_cluster_share` | 0.486 | 0.543 | 0.367 | 0.437 | 0.012 |
+| 0.4 | `vol_ratio` | 2.725 | 3.006 | 2.532 | 2.664 | -0.148 |
+
+OLS interaction estimates with run fixed effects and HC3 standard errors:
+
+| `hft_frac` | metric | `delay:thin_book` coef | HC3 SE | 95% CI | p approx. | CI excludes 0 |
+|---:|---|---:|---:|---:|---:|---|
+| 0.2 | `acf_abs_ret_1` | 0.004 | 0.019 | [-0.033, 0.041] | 0.826 | no |
+| 0.2 | `acf_abs_ret_5` | 0.030 | 0.018 | [-0.004, 0.064] | 0.086 | no |
+| 0.2 | `high_vol_cluster_share` | -0.082 | 0.042 | [-0.165, 0.000] | 0.051 | no |
+| 0.2 | `vol_ratio` | -0.525 | 0.247 | [-1.008, -0.041] | 0.033 | yes, negative |
+| 0.4 | `acf_abs_ret_1` | 0.012 | 0.018 | [-0.024, 0.047] | 0.519 | no |
+| 0.4 | `acf_abs_ret_5` | -0.027 | 0.017 | [-0.060, 0.005] | 0.098 | no |
+| 0.4 | `high_vol_cluster_share` | 0.012 | 0.043 | [-0.072, 0.096] | 0.782 | no |
+| 0.4 | `vol_ratio` | -0.148 | 0.278 | [-0.692, 0.396] | 0.594 | no |
+
+Confirmatory interpretation:
+
+- The delay main effect is clearly visible:
+  - at `hft_frac=0.2`, deep-book `acf_abs_ret_1` rises from `0.300` to `0.426` when `lag` moves from 0 to 1;
+  - at `hft_frac=0.4`, deep-book `acf_abs_ret_1` rises from `0.288` to `0.373`.
+- The thin-book main effect is small:
+  - at `lag=0`, `acf_abs_ret_1` rises from `0.300` to `0.323` for `hft_frac=0.2`;
+  - at `lag=0`, `acf_abs_ret_1` rises from `0.288` to `0.307` for `hft_frac=0.4`.
+- The confirmatory interaction is not supported:
+  - neither `acf_abs_ret_1` nor `acf_abs_ret_5` has a 95% CI excluding zero;
+  - the interaction signs are mixed across metrics and `hft_frac`;
+  - the only statistically stable interaction is negative for `vol_ratio` at `hft_frac=0.2`, which goes against the superadditive H3 prediction.
+
+Final confirmatory conclusion:
+
+> The focused 2x2 confirmatory experiment rejects the strong H3 interaction claim in this ABM configuration. Information delay robustly increases volatility clustering, and thinner books weakly raise ACF-based clustering, but their combination does not produce a statistically stable positive superadditive interaction. Therefore, H3 should be reported as partial support for the delay-to-clustering mechanism and as a null/negative result for the delay x illiquidity amplification mechanism.
 
 ### Technical fix: plotting bug in `experiment_unified.py`
 
