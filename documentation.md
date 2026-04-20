@@ -780,7 +780,7 @@ Note: when grouping `unified_all_raw.csv`, always include the `grid` column. Som
 
 ### Statistical methods
 
-- **Mann-Whitney U test** (non-parametric): pairwise comparison of vol_ratio at φ=0 vs each φ, one-sided, p < 0.05
+- **Mann-Whitney U test** (non-parametric): pairwise comparison of vol_ratio at φ=0 vs each φ, one-sided, nominal p < 0.05. These tests are **not corrected for multiple comparisons** and should be used as supportive evidence, not as standalone proof.
 - **Bootstrap 95% CI** (1000 resamples): used on metric plots
 - **Sensitivity analysis**: tipping point at thresholds 1.1×–1.5×
 
@@ -1215,6 +1215,18 @@ The experiment completed successfully:
 
 The tested shock values are weaker versions of the original `dp=-10` benchmark plus the benchmark itself. The experiment does **not** test more extreme shocks such as `dp=-15` or `dp=-20`; those would be a separate catastrophic-shock regime.
 
+Important comparability caveat:
+
+- this experiment should be interpreted as a **standalone robustness sweep**, not as an exact continuation of Unified Grid 1;
+- the `dp=-10, speed_mult=2, phi=0` cell in this sweep has baseline `vol_ratio=2.312`;
+- the corresponding Unified Grid 1 `speed_mult=2, phi=0` baseline is `vol_ratio≈1.746`;
+- the broad modeling setup is the same, but the shock-magnitude script uses its own deterministic seed stream and standalone population path;
+- therefore, the `dp=-10` row in this sweep should **not** be used as a direct numerical reproduction of the Grid 1 `speed×2` cell.
+
+This does not invalidate the shock-magnitude experiment. It means the experiment answers a narrower question:
+
+> Under the shock-magnitude script's own controlled configuration, does the HFT tipping effect appear across several shock sizes?
+
 Tipping-point summary:
 
 | shock_dp | speed_mult | baseline vol_ratio at phi=0 | 1.3× threshold | phi_star | max vol_ratio | phi at max |
@@ -1262,9 +1274,9 @@ The non-monotonic movement of `phi*` is expected under a relative threshold rule
 
 Thus, a stronger shock does not necessarily produce a lower `phi*`, because the benchmark market without HFT is also more unstable.
 
-The correct conclusion is:
+The correct, paper-safe conclusion is:
 
-> The HFT-related tipping effect is robust across the tested shock magnitudes, but the exact value of `phi*` is shock-size-dependent. The tipping point should be interpreted as a regime-dependent threshold rather than a fixed structural constant.
+> In an independent shock-magnitude robustness sweep, the HFT-related tipping effect appears across all tested shock magnitudes, but the exact value of `phi*` is shock-size- and sample-dependent. Because the sweep uses its own deterministic seed stream and does not exactly reproduce the Unified Grid 1 `dp=-10` baseline, it should be interpreted as standalone robustness evidence rather than as a direct perturbation around Grid 1. The tipping point is a regime-dependent threshold, not a fixed structural constant.
 
 ### Follow-up 6: Presentation notebook (`/Users/arinaravilova/Desktop/unified_experiment_talk.ipynb`)
 
@@ -1728,19 +1740,21 @@ Interpretation:
 
 3. **The original Chartist is CONTRARIAN.** This is by design in the original code (bognik002). For HFT modeling, use TrendChartist (corrected signs). Do not "fix" the original Chartist — it may be needed for other experiments.
 
-4. **MarketMaker panic flag is diagnostic only.** The panic-triggered rebalancing logic in the original code never fires because it checks for `None` instead of zero.
+4. **Core `Chartist.change_sentiment()` bypasses delayed price helpers.** The core `Chartist` implementation calls `self.market.price()` directly inside sentiment updating, so it does not fully respect `_get_price()` / delayed price infrastructure. This does **not** affect the final H1/H2/noisy-delay results because the relevant experiments use local `TrendChartist` / `SlowTrendChartist` overrides, but it is a pitfall if future experiments reuse the core `Chartist` for delay logic.
 
-5. **experiment_h1_v7.py has a bug** — the `delayed_price_lag` parameter is declared but never passed to the simulator. It's functionally identical to v6.
+5. **MarketMaker panic flag is diagnostic only.** The panic-triggered rebalancing logic in the original code never fires because it checks for `None` instead of zero.
 
-6. **simulator_hft.py is separate from simulator.py.** It has its own Simulator class with front-running logic. Only used in experiment_h1_v8.py.
+6. **experiment_h1_v7.py has a bug** — the `delayed_price_lag` parameter is declared but never passed to the simulator. It's functionally identical to v6.
 
-7. **All experiment files are standalone scripts.** Each experiment_h1_v*.py file contains its own population setup, grid, run loop, metrics, and plotting. They import from AgentBasedModel but are self-contained.
+7. **simulator_hft.py is separate from simulator.py.** It has its own Simulator class with front-running logic. Only used in experiment_h1_v8.py.
 
-8. **The speed attribute is ad-hoc.** It's set via `trader.speed = 'fast'` after construction, not as a constructor parameter. The simulator checks it with `getattr(t, 'speed', 'slow')`.
+8. **All experiment files are standalone scripts.** Each experiment_h1_v*.py file contains its own population setup, grid, run loop, metrics, and plotting. They import from AgentBasedModel but are self-contained.
 
-9. **CSV column names vary between versions.** v1-v2 use `fast_share`, v3+ use `hft_frac`. Some versions have `dp` (shock magnitude), `softlimit`, `lag` columns depending on the grid.
+9. **The speed attribute is ad-hoc.** It's set via `trader.speed = 'fast'` after construction, not as a constructor parameter. The simulator checks it with `getattr(t, 'speed', 'slow')`.
 
-10. **Plots have been translated to English** in the latest commits on both experiment branches. Earlier commits have Russian plot labels.
+10. **CSV column names vary between versions.** v1-v2 use `fast_share`, v3+ use `hft_frac`. Some versions have `dp` (shock magnitude), `softlimit`, `lag` columns depending on the grid.
+
+11. **Plots have been translated to English** in the latest commits on both experiment branches. Earlier commits have Russian plot labels.
 
 ---
 
