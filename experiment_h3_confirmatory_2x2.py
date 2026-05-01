@@ -3,6 +3,9 @@
 H3 confirmatory 2x2 experiment.
 
 Focused test of the delay x thin-book interaction in the clean H3 design.
+After the supervisor's revision, H3 is interpreted as shock absorption rather
+than volatility clustering: does the market absorb the same shock worse when
+information is delayed and the order book is thin?
 
 Default final run:
     python3 experiment_h3_confirmatory_2x2.py
@@ -43,11 +46,9 @@ DEFAULT_RETURN_WINDOW = 10
 DEFAULT_OUTPUT_PREFIX = "h3_confirmatory"
 
 CONFIRMATORY_METRICS = [
-    "acf_abs_ret_1",
-    "acf_abs_ret_5",
-    "high_vol_cluster_share",
-    "vol_ratio",
-    "vol_persistence",
+    "recovery_time",
+    "max_drawdown",
+    "stabilization_gap",
 ]
 
 
@@ -273,13 +274,12 @@ def fit_ols_hc3(
 
 def plot_metrics(agg: pd.DataFrame, output_path: str) -> None:
     metrics = [
-        ("acf_abs_ret_1", "ACF |returns| lag 1"),
-        ("acf_abs_ret_5", "ACF |returns| lag 5"),
-        ("high_vol_cluster_share", "High-vol cluster share"),
-        ("vol_ratio", "Volatility ratio"),
+        ("recovery_time", "Recovery time"),
+        ("max_drawdown", "Maximum drawdown"),
+        ("stabilization_gap", "Stabilization gap"),
     ]
-    fig, axes = plt.subplots(2, 2, figsize=(13, 9), sharex=True)
-    axes = axes.ravel()
+    fig, axes = plt.subplots(1, len(metrics), figsize=(5.5 * len(metrics), 4.5), sharex=True)
+    axes = np.asarray(axes).ravel()
     for ax, (metric, title) in zip(axes, metrics):
         for lag in sorted(agg["info_lag"].unique()):
             for book_volume, style in [(300, "-"), (1500, "--")]:
@@ -306,16 +306,16 @@ def plot_metrics(agg: pd.DataFrame, output_path: str) -> None:
         ax.set_ylabel(metric)
         ax.grid(True, alpha=0.25)
     axes[0].legend(fontsize=8)
-    fig.suptitle("H3 confirmatory 2x2 metrics", fontsize=15, fontweight="bold")
+    fig.suptitle("H3 confirmatory shock-absorption metrics", fontsize=15, fontweight="bold")
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     fig.savefig(output_path, dpi=180)
     plt.close(fig)
 
 
 def plot_interactions(ols: pd.DataFrame, run_summary: pd.DataFrame, output_path: str) -> None:
-    metrics = ["acf_abs_ret_1", "acf_abs_ret_5", "high_vol_cluster_share", "vol_ratio"]
-    fig, axes = plt.subplots(2, 2, figsize=(13, 9), sharey=False)
-    axes = axes.ravel()
+    metrics = list(CONFIRMATORY_METRICS)
+    fig, axes = plt.subplots(1, len(metrics), figsize=(5.5 * len(metrics), 4.5), sharey=False)
+    axes = np.asarray(axes).ravel()
     for ax, metric in zip(axes, metrics):
         ols_sub = ols[ols["metric"] == metric].sort_values("hft_frac")
         run_sub = run_summary[run_summary["metric"] == metric].sort_values("hft_frac")
@@ -348,7 +348,7 @@ def plot_interactions(ols: pd.DataFrame, run_summary: pd.DataFrame, output_path:
         ax.set_title(metric)
         ax.grid(True, alpha=0.25)
     axes[0].legend(fontsize=9)
-    fig.suptitle("H3 confirmatory interaction estimates", fontsize=15, fontweight="bold")
+    fig.suptitle("H3 confirmatory shock-absorption interaction estimates", fontsize=15, fontweight="bold")
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     fig.savefig(output_path, dpi=180)
     plt.close(fig)

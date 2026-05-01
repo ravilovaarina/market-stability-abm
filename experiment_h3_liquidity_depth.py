@@ -1,8 +1,11 @@
 """
-H3-clean: volatility clustering from information delay and order-book depth.
+H3-clean: shock absorption from information delay and order-book depth.
 
 This is a cleaner H3 follow-up. Instead of using MarketMaker softlimit as the
 liquidity proxy, it varies the initial order-book depth via ExchangeAgent.volume.
+The revised H3 interpretation focuses on whether the market absorbs the shock
+better or worse, so the raw output includes recovery time and post-shock
+stabilization-price metrics in addition to the earlier clustering diagnostics.
 
 Default final run:
     python3 experiment_h3_liquidity_depth.py
@@ -59,6 +62,43 @@ DEFAULT_SHOCK_DP = -10
 DEFAULT_SPEED_MULTIPLIER = 2
 DEFAULT_SOFTLIMIT = 100
 DEFAULT_OUTPUT_PREFIX = "h3_depth"
+STABILIZATION_WINDOW = 50
+
+SHOCK_ABSORPTION_METRICS = [
+    "stabilization_price",
+    "stabilization_price_ratio",
+    "stabilization_gap",
+]
+
+ALL_DEPTH_METRICS = ALL_METRICS + SHOCK_ABSORPTION_METRICS
+
+
+def stabilization_metrics(info, shock_it: int = 200, window: int = STABILIZATION_WINDOW) -> Dict[str, float]:
+    """Measure the price level where the market settles after the shock.
+
+    `stabilization_price` is the mean price in the last `window` simulated
+    iterations. `stabilization_gap` is expressed relative to the pre-shock
+    price, so larger values mean a worse post-shock stabilization level.
+    """
+    if len(info.prices) <= shock_it:
+        return {
+            "stabilization_price": np.nan,
+            "stabilization_price_ratio": np.nan,
+            "stabilization_gap": np.nan,
+        }
+
+    pre_price = float(info.prices[shock_it - 1])
+    tail = info.prices[max(shock_it, len(info.prices) - window):]
+    stabilization_price = float(np.mean(tail)) if tail else np.nan
+    if not np.isfinite(pre_price) or abs(pre_price) < 1e-12:
+        ratio = np.nan
+    else:
+        ratio = stabilization_price / pre_price
+    return {
+        "stabilization_price": stabilization_price,
+        "stabilization_price_ratio": ratio,
+        "stabilization_gap": 1.0 - ratio if np.isfinite(ratio) else np.nan,
+    }
 
 
 def run_one(
@@ -119,6 +159,7 @@ def run_one(
         "recovery_time": recovery_time(info, shock_it),
         "mm_panic_ratio": info.mm_panic_ratio(from_it=shock_it),
     }
+    row.update(stabilization_metrics(info, shock_it=shock_it))
     row.update(clustering_metrics(info, shock_it=shock_it, return_window=return_window))
     return row
 
@@ -129,7 +170,9 @@ def aggregate(raw: pd.DataFrame) -> pd.DataFrame:
     for keys, sub in raw.groupby(group_cols):
         row = dict(zip(group_cols, keys))
         row["n_runs"] = len(sub)
-        for metric in ALL_METRICS:
+        for metric in ALL_DEPTH_METRICS:
+            if metric not in sub.columns:
+                continue
             values = sub[metric].dropna().values
             row[f"{metric}_mean"] = float(np.mean(values)) if len(values) else np.nan
             row[f"{metric}_std"] = float(np.std(values, ddof=1)) if len(values) > 1 else np.nan
