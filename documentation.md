@@ -1746,7 +1746,7 @@ environment, then measures volatility over windows containing approximately the 
 The experiment keeps the H1 unified environment fixed:
 
 - population: 10 Fundamentalists + 10 TrendChartists + 5 Random agents + 1 MarketMaker;
-- HFT share: `hft_frac ∈ {0.0, 0.2, 0.4, 0.6}`;
+- HFT share: `hft_frac ∈ {0.0, 0.2, 0.4, 0.6, 0.8, 1.0}`;
 - speed advantage: `speed_multiplier=2`;
 - information lag: `info_lag=0`;
 - shock: `MarketPriceShock(t=200, dp=-10)`;
@@ -1813,18 +1813,18 @@ h2_postshock_volume_diffs.png
 The completed run produced:
 
 ```text
-raw rows: 400
-aggregated rows: 8
-paired difference rows: 200
-diff summary rows: 4
+raw rows: 600
+aggregated rows: 12
+paired difference rows: 300
+diff summary rows: 6
 ```
 
 Each `hft_frac` has 50 calendar runs and 50 event-time runs:
 
 | mode | phi values | runs per phi |
 |---|---|---:|
-| `calendar` | 0.0, 0.2, 0.4, 0.6 | 50 |
-| `event_time` | 0.0, 0.2, 0.4, 0.6 | 50 |
+| `calendar` | 0.0, 0.2, 0.4, 0.6, 0.8, 1.0 | 50 |
+| `event_time` | 0.0, 0.2, 0.4, 0.6, 0.8, 1.0 | 50 |
 
 #### Aggregated Results
 
@@ -1834,18 +1834,25 @@ Each `hft_frac` has 50 calendar runs and 50 event-time runs:
 | calendar | 0.2 | 0.000053 | 0.000169 | 0.000389 | 6.530 | 4,217 | 4,230 | -13 | 7,269 | 1.000 | 1.000 | 0.000 |
 | calendar | 0.4 | 0.000066 | 0.000214 | 0.000422 | 7.980 | 4,609 | 4,623 | -14 | 7,909 | 1.000 | 1.000 | 0.000 |
 | calendar | 0.6 | 0.000104 | 0.000348 | 0.000535 | 8.963 | 5,129 | 5,148 | -18 | 8,965 | 1.000 | 1.000 | 0.000 |
+| calendar | 0.8 | 0.000103 | 0.000348 | 0.000529 | 15.153 | 5,559 | 5,578 | -19 | 9,733 | 1.000 | 1.000 | 0.000 |
+| calendar | 1.0 | 0.000117 | 0.000398 | 0.000549 | 13.712 | 5,908 | 5,928 | -20 | 10,144 | 1.000 | 1.000 | 0.017 |
 | event_time | 0.0 | 0.000029 | 0.000087 | 0.000337 | 2.676 | 3,855 | 3,843 | +11 | 10,170 | 1.000 | 1.686 | 0.000 |
 | event_time | 0.2 | 0.000055 | 0.000180 | 0.000479 | 6.128 | 4,241 | 4,230 | +11 | 11,236 | 1.000 | 1.634 | 0.000 |
 | event_time | 0.4 | 0.000059 | 0.000192 | 0.000485 | 6.166 | 4,635 | 4,623 | +13 | 12,046 | 1.000 | 1.604 | 0.000 |
 | event_time | 0.6 | 0.000074 | 0.000245 | 0.000562 | 7.308 | 5,162 | 5,148 | +14 | 13,410 | 1.000 | 1.605 | 0.000 |
+| event_time | 0.8 | 0.000083 | 0.000275 | 0.000596 | 8.453 | 5,558 | 5,578 | -20 | 14,191 | 0.992 | 1.976 | 0.008 |
+| event_time | 1.0 | 0.000127 | 0.000425 | 0.000677 | 6.539 | 5,841 | 5,928 | -87 | 14,870 | 0.967 | 3.161 | 0.033 |
 
 Technical validation:
 
 - the matched post-shock volume window is very close to the target volume;
-- `threshold_hit_rate=1.0`, so event-time ticks always reached the target before the safety cap;
-- `book_depleted_rate=0.0`, so the results are not driven by order-book failure;
-- event-time uses about 1.6 inner trading rounds per recorded tick, confirming that the event clock changes
-  the amount of trading represented by a tick.
+- `threshold_hit_rate` is equal to 1.0 for `phi <= 0.6` and remains high at `phi=0.8` (0.992)
+  and `phi=1.0` (0.967), so event-time ticks usually reach the target before the safety cap;
+- `book_depleted_rate` is zero for `phi <= 0.6` and remains low at high HFT shares
+  (`0.008` at `phi=0.8`, `0.033` at `phi=1.0`);
+- event-time uses about 1.6 inner trading rounds per recorded tick for `phi <= 0.6`, rising
+  to about 2.0 at `phi=0.8` and 3.2 at `phi=1.0`, confirming that high-HFT event-time ticks
+  require more inner trading rounds.
 
 #### Paired Differences: `event_time - calendar`
 
@@ -1855,6 +1862,8 @@ Technical validation:
 | 0.2 | +0.000002 | [-0.000018, 0.000023] | +0.000011 | [-0.000058, 0.000078] | +0.000090 | [0.000010, 0.000171] | -0.402 | [-3.218, 2.349] |
 | 0.4 | -0.000006 | [-0.000033, 0.000024] | -0.000022 | [-0.000113, 0.000078] | +0.000062 | [-0.000030, 0.000161] | -1.814 | [-6.119, 2.609] |
 | 0.6 | -0.000030 | [-0.000062, -0.0000003] | -0.000103 | [-0.000211, 0.0000004] | +0.000027 | [-0.000066, 0.000121] | -1.655 | [-5.300, 2.304] |
+| 0.8 | -0.000020 | [-0.000055, 0.000013] | -0.000073 | [-0.000191, 0.000040] | +0.000067 | [-0.000034, 0.000170] | -6.700 | [-13.635, 0.356] |
+| 1.0 | +0.000011 | [-0.000051, 0.000070] | +0.000027 | [-0.000177, 0.000224] | +0.000128 | [-0.000021, 0.000265] | -7.172 | [-12.248, -2.666] |
 
 #### Interpretation
 
@@ -1868,9 +1877,12 @@ What it shows:
 - the only clearly negative RV-per-volume difference is at `phi=0.6`, where event time is lower than calendar
   by about `0.000030`;
 - at `phi=0.2`, event time is slightly higher than calendar on the primary volume-normalized volatility metric;
-- the equal-volume post/pre ratio is lower under event time in all four phi groups, but only the `phi=0.0`
-  confidence interval clearly excludes zero;
-- event time is technically well behaved in this run: it reaches volume targets and does not deplete the book.
+- the equal-volume post/pre ratio is lower under event time in all six phi groups, with the clearest bootstrap
+  confidence-interval evidence at `phi=0.0` and `phi=1.0`;
+- the added high-HFT regimes (`phi=0.8`, `phi=1.0`) show lower equal-volume vol ratios under event time, but
+  they do not show a uniform reduction in RV per volume or RV per trade;
+- event time is technically well behaved in this run: it usually reaches volume targets and book depletion
+  remains low even at high HFT shares.
 
 The paper-safe conclusion is:
 
@@ -1882,6 +1894,68 @@ The paper-safe conclusion is:
 
 This improved check strengthens the H2 section because it removes the main criticism of the earlier event-time
 comparison: unequal trade volume across clocks.
+
+### H2 paired statistical tests
+
+After the equal-volume H2 comparison, a final analysis-only statistical layer was added in
+`experiment_h2_paired_stat_tests.py`. It does not run new simulations. It reads
+`h2_postshock_volume_paired_diffs.csv`, where each row is a matched pair of runs with the
+same `phi` and random seed, and tests whether the event-time metric is lower than the
+calendar-time metric.
+
+All differences are defined as:
+
+```
+event-time metric - calendar-time metric
+```
+
+For instability metrics, a negative value therefore means that event time is lower / more stable.
+
+The final H2 statistical outputs are:
+
+- `h2_paired_stat_tests.csv`
+- `h2_paired_stat_tests.md`
+- `h2_paired_stat_tests.png`
+
+The tests are:
+
+- bootstrap 95% confidence interval for the mean paired difference;
+- one-sided Wilcoxon signed-rank test with alternative `event time < calendar time`;
+- exact sign test for whether negative paired differences are more frequent than positive ones.
+- effect sizes:
+  - paired Cohen's `d_z` for raw differences;
+  - matched-pairs rank-biserial effect size, where positive values mean event-time metrics are lower;
+- multiple-testing corrections:
+  - Holm-Bonferroni;
+  - Benjamini-Hochberg false-discovery-rate correction.
+
+#### Main H2 statistical findings
+
+| phi | Statistically lower under event time | Mixed / not significant | Higher under event time |
+|---:|---|---|---|
+| 0.0 | equal-volume vol ratio, calendar-style vol ratio, spread ratio | RV per volume, RV per trade, vol / sqrt(volume) | none |
+| 0.2 | none | RV per volume, RV per trade, equal-volume vol ratio, calendar-style vol ratio, spread ratio | vol / sqrt(volume) |
+| 0.4 | none | all tested metrics | none |
+| 0.6 | none | all tested metrics | none |
+| 0.8 | equal-volume vol ratio | RV per volume, RV per trade, vol / sqrt(volume), calendar-style vol ratio, spread ratio | none |
+| 1.0 | equal-volume vol ratio, calendar-style vol ratio | RV per volume, RV per trade, vol / sqrt(volume), spread ratio | none |
+
+Across the 36 primary `phi × metric` cells, 13 show uncorrected statistical evidence that event time is
+lower than calendar time by either bootstrap confidence intervals or one-sided Wilcoxon at the
+5% level. After Benjamini-Hochberg correction across all H2 paired tests, 4 Wilcoxon cells remain
+significant; after Holm correction, 2 remain significant. Only one cell shows bootstrap evidence that
+event time is higher (`vol / sqrt(volume)` at `phi=0.2`).
+
+The strongest event-time improvement appears in post/pre volatility-ratio metrics, especially
+`equal_volume_vol_ratio` at `phi=0.0`, `phi=0.8`, and `phi=1.0`, and `calendar_style_vol_ratio`
+at `phi=0.0` and `phi=1.0`. At `phi=0.2` and `phi=0.4`, most paired differences are not
+statistically distinguishable from zero. Thus, H2
+should not be stated as "event time universally stabilizes the market." The defensible conclusion is:
+
+> Event-time measurement can reduce some post-shock volatility and spread measures, but the
+> stabilizing effect is regime-dependent and not uniform across HFT shares. H2 is therefore
+> partially supported as a clock-representation effect, while the H1 speed-driven instability
+> remains robust under the equal-volume event-time comparison.
 
 ### Technical fix: plotting bug in `experiment_unified.py`
 
