@@ -1,0 +1,13 @@
+test,hft_frac,metric,comparison,effect_estimate,effect_direction,p_value,ci_low,ci_high,n_obs,n_runs,p_holm,p_bh,significant_holm_5pct,significant_bh_5pct,supports_shock_absorption_h3
+Mann_Whitney_worst_vs_best,0.2,max_drawdown,lag=1 thin book minus lag=0 deep book,0.0929875891509044,worst_case_higher,1.0720414747715321e-13,,,400,200,5.360207373857661e-13,3.2161244243145964e-13,True,True,True
+Mann_Whitney_worst_vs_best,0.2,recovery_time,lag=1 thin book minus lag=0 deep book,-23.71,worst_case_not_higher,0.9999999999999788,,,400,200,1.0,0.9999999999999788,False,False,False
+Mann_Whitney_worst_vs_best,0.2,stabilization_gap,lag=1 thin book minus lag=0 deep book,-0.0452802053118524,worst_case_not_higher,0.9885800621911882,,,400,200,1.0,0.9999999999999788,False,False,False
+Mann_Whitney_worst_vs_best,0.4,max_drawdown,lag=1 thin book minus lag=0 deep book,0.156711100175634,worst_case_higher,2.8483102797016467e-21,,,400,200,1.7089861678209882e-20,1.7089861678209882e-20,True,True,True
+Mann_Whitney_worst_vs_best,0.4,recovery_time,lag=1 thin book minus lag=0 deep book,-6.045000000000002,worst_case_not_higher,0.9999947018841632,,,400,200,1.0,0.9999999999999788,False,False,False
+Mann_Whitney_worst_vs_best,0.4,stabilization_gap,lag=1 thin book minus lag=0 deep book,-0.0335358779077173,worst_case_not_higher,0.7760704756475114,,,400,200,1.0,0.9999999999999788,False,False,False
+OLS_HC3_delay_x_thin_book,0.2,max_drawdown,factorial interaction,0.0217266815123929,worse_under_combination,0.1693356528217891,-0.0092585519411551,0.0527119149659411,800,200,0.4481561438565896,0.20320278338614695,False,False,False
+OLS_HC3_delay_x_thin_book,0.2,recovery_time,factorial interaction,24.740000000001793,worse_under_combination,0.017275952895461,4.372570753818586,45.107429246185,800,200,0.10365571737276601,0.10365571737276601,False,False,False
+OLS_HC3_delay_x_thin_book,0.2,stabilization_gap,factorial interaction,-0.0320071820694196,not_worse,0.0826973201897419,-0.0681600346526239,0.0041456705137846,800,200,0.4134866009487095,0.17710017058998884,False,False,False
+OLS_HC3_delay_x_thin_book,0.4,max_drawdown,factorial interaction,0.0347405764784553,worse_under_combination,0.1180667803933259,-0.00882574295032,0.0783068959072307,800,200,0.4481561438565896,0.17710017058998884,False,False,False
+OLS_HC3_delay_x_thin_book,0.4,recovery_time,factorial interaction,16.89000000000009,worse_under_combination,0.1120390359641474,-3.9422398973442334,37.72223989734441,800,200,0.4481561438565896,0.17710017058998884,False,False,False
+OLS_HC3_delay_x_thin_book,0.4,stabilization_gap,factorial interaction,0.0087755920125395,worse_under_combination,0.7494410739686398,-0.0450798530715122,0.0626310370965913,800,200,0.7494410739686398,0.7494410739686398,False,False,False

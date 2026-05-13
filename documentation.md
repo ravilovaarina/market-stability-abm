@@ -2251,6 +2251,66 @@ Final confirmatory conclusion:
 
 > The focused 2x2 confirmatory experiment rejects the strong H3 interaction claim in this ABM configuration. Information delay robustly increases volatility clustering, and thinner books weakly raise ACF-based clustering, but their combination does not produce a statistically stable positive superadditive interaction. Therefore, H3 should be reported as partial support for the delay-to-clustering mechanism and as a null/negative result for the delay x illiquidity amplification mechanism.
 
+#### Final H3 statistical synthesis after multiple-testing correction
+
+After the exploratory and confirmatory H3 runs, the final synthesis script was added:
+
+```bash
+python3 experiment_h3_final_summary.py
+```
+
+This script does **not** run new simulations. It summarizes already completed H3 outputs:
+
+```text
+h3_clustering_interactions_bootstrap.csv
+h3_depth_interactions_bootstrap.csv
+h3_shock_absorption_ols.csv
+h3_shock_absorption_mw.csv
+```
+
+and writes:
+
+```text
+h3_final_summary_clustering_interactions.csv
+h3_final_summary_shock_absorption.csv
+h3_final_summary.md
+h3_final_summary.png
+```
+
+Why this final synthesis is needed:
+
+- the exploratory H3 grids contain many tested cells;
+- some cells have uncorrected bootstrap `p < 0.05`, but this can happen by chance when many comparisons are made;
+- therefore the final summary adds Holm and Benjamini-Hochberg corrections;
+- the final conclusion is based on corrected evidence, not isolated uncorrected cells.
+
+Final corrected results:
+
+| H3 interpretation | Tested rows | BH-significant rows | Holm-significant rows | Supporting rows after BH |
+|---|---:|---:|---:|---:|
+| Original H3: delay x illiquidity -> stronger volatility clustering | 420 | 0 | 0 | 0 |
+| Revised H3: delay x thin book -> weaker shock absorption | 12 | 2 | 2 | 2 |
+
+The two shock-absorption rows that survive both corrections are:
+
+| Test | `hft_frac` | Metric | Effect estimate | Corrected interpretation |
+|---|---:|---|---:|---|
+| Mann-Whitney worst-vs-best | 0.2 | `max_drawdown` | 0.09299 | worst case has larger drawdown |
+| Mann-Whitney worst-vs-best | 0.4 | `max_drawdown` | 0.15671 | worst case has larger drawdown |
+
+Important nuance:
+
+- the original volatility-clustering interaction is **not confirmed** after correction;
+- the delay mechanism itself is still useful: delayed information raises clustering metrics in the clean depth experiment;
+- the thin-book mechanism is weak but visible in ACF metrics;
+- the full superadditive interaction `delay x thin_book` is not robust for volatility clustering;
+- the revised shock-absorption framing has **partial support**, specifically for deeper maximum drawdown in the worst-case regime;
+- recovery time and stabilization gap do not give robust corrected support.
+
+Final H3 wording for the paper:
+
+> H3 is partially supported, but not in its strongest original form. Information delay is associated with stronger post-shock volatility clustering, and thin order books weakly increase ACF-based clustering. However, the corrected evidence does not confirm a robust superadditive delay x illiquidity effect on volatility clustering. A revised shock-absorption interpretation receives partial support: when information is delayed and the order book is thin, the market suffers a significantly deeper maximum drawdown than in the no-delay deep-book baseline. The result should therefore be reported as partial support for the instability mechanism, with a null result for the full volatility-clustering interaction.
+
 ### Technical fix: plotting bug in `experiment_unified.py`
 
 During plotting, a `KeyError: 'drawdown'` was discovered.
