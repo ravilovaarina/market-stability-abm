@@ -7,6 +7,22 @@ Experiment H1 v4: те же агенты что в v3, но n_runs=30
 """
 
 import random
+import os
+import sys
+from pathlib import Path
+
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/1d-abm-mplconfig")
+os.makedirs(os.environ["MPLCONFIGDIR"], exist_ok=True)
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+RAW_DIR = PROJECT_ROOT / "results" / "h1" / "raw"
+FIGURE_DIR = PROJECT_ROOT / "results" / "h1" / "figures"
+RAW_DIR.mkdir(parents=True, exist_ok=True)
+FIGURE_DIR.mkdir(parents=True, exist_ok=True)
+sys.path.insert(0, str(PROJECT_ROOT))
+
+import matplotlib
+matplotlib.use("Agg")
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -150,7 +166,9 @@ def find_tipping_point(agg, col, baseline_multiplier=1.3):
 
 # ── Графики ───────────────────────────────────────────────────────────────────
 
-def plot_results(agg, df, shock_dp, save='h1_v4_results.png'):
+def plot_results(agg, df, shock_dp, save=None):
+    if save is None:
+        save = FIGURE_DIR / "h1_v4_results.png"
     fig = plt.figure(figsize=(16, 12))
     gs = gridspec.GridSpec(2, 3, hspace=0.45, wspace=0.35)
     x = agg['fast_share']
@@ -210,7 +228,7 @@ if __name__ == '__main__':
     print(f'\n[1/2] Полный грид (11 × 30 = 330 симуляций, dp={SHOCK_DP})...')
     print('      Ожидаемое время: ~30-40 минут')
     df = run_grid(n_runs=30, n_iter=500, shock_it=200, shock_dp=SHOCK_DP)
-    df.to_csv('h1_v4_raw.csv', index=False)
+    df.to_csv(RAW_DIR / "h1_v4_raw.csv", index=False)
 
     agg = aggregate(df)
     print('\nАгрегированные результаты:')

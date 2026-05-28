@@ -9,6 +9,20 @@
 """
 
 import random
+import os
+import sys
+from pathlib import Path
+
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/1d-abm-mplconfig")
+os.makedirs(os.environ["MPLCONFIGDIR"], exist_ok=True)
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+FIGURE_DIR = PROJECT_ROOT / "results" / "h1" / "figures"
+FIGURE_DIR.mkdir(parents=True, exist_ok=True)
+sys.path.insert(0, str(PROJECT_ROOT))
+
+import matplotlib
+matplotlib.use("Agg")
 import numpy as np
 import matplotlib.pyplot as plt
 from AgentBasedModel import *
@@ -89,8 +103,9 @@ axes[1,1].legend(); axes[1,1].grid(alpha=0.3)
 plt.suptitle(f'Diagnostics: crisis_share without shock = {crisis_no:.2f}, with shock = {crisis_sh:.2f}',
              fontsize=12, fontweight='bold')
 plt.tight_layout()
-plt.savefig('h1_baseline_check_prices_volatility.png', dpi=150, bbox_inches='tight')
-print('\nСохранено: h1_baseline_check_prices_volatility.png')
+baseline_path = FIGURE_DIR / "h1_baseline_check_prices_volatility.png"
+plt.savefig(baseline_path, dpi=150, bbox_inches='tight')
+print(f'\nСохранено: {baseline_path}')
 
 # --- Вывод ---
 print('\n' + '=' * 55)

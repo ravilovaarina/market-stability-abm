@@ -1,19 +1,34 @@
 """
-Experiment H1 v3: Tipping Point — новые метрики
-================================================
-Проблема v1/v2: general_states() классифицирует ~80% нормального поведения
-модели как 'panic'/'disaster' даже без шока. Метрика нерабочая.
+Experiment H1 v5: разделяем эффекты скорости и информации
+==========================================================
+Проблема v4: быстрые агенты имели И приоритет в очереди И лучший
+access (5 vs 1). Это смешивало два эффекта — нельзя было понять
+что именно влияет на стабильность.
 
-Решение: убираем general_states(), считаем метрики напрямую из info:
-  1. vol_ratio     — средняя волатильность после шока / до шока
-  2. spread_ratio  — средний спред после шока / до шока
-  3. recovery_time — сколько итераций цена остаётся ниже уровня до шока
-  4. mm_panic_ratio — доля итераций где MarketMaker в панике (после шока)
+В v5: у всех агентов одинаковый access=1.
+Быстрые агенты имеют ТОЛЬКО приоритет в очереди (вызываются раньше
++ extra call). Никакого информационного преимущества.
 
-Tipping point = резкий скачок любой из этих метрик при росте fast_share.
+Цель: изолировать чистый эффект latency heterogeneity.
 """
 
 import random
+import os
+import sys
+from pathlib import Path
+
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/1d-abm-mplconfig")
+os.makedirs(os.environ["MPLCONFIGDIR"], exist_ok=True)
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+RAW_DIR = PROJECT_ROOT / "results" / "h1" / "raw"
+FIGURE_DIR = PROJECT_ROOT / "results" / "h1" / "figures"
+RAW_DIR.mkdir(parents=True, exist_ok=True)
+FIGURE_DIR.mkdir(parents=True, exist_ok=True)
+sys.path.insert(0, str(PROJECT_ROOT))
+
+import matplotlib
+matplotlib.use("Agg")
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -30,10 +45,7 @@ from AgentBasedModel.utils.math import mean, std
 # ── Метрики ───────────────────────────────────────────────────────────────────
 
 def vol_ratio(info, shock_it=200, window=10):
-    """Волатильность после шока / до шока."""
     vols = info.price_volatility(window=window)
-    # price_volatility(window) возвращает список длины n-window
-    # индексы сдвинуты на window
     pre  = vols[:shock_it - window]
     post = vols[shock_it:]
     if not pre or not post:
@@ -42,7 +54,6 @@ def vol_ratio(info, shock_it=200, window=10):
 
 
 def spread_ratio(info, shock_it=200):
-    """Средний относительный спред после / до шока."""
     def rel(spreads, prices):
         vals = [(s['ask'] - s['bid']) / p for s, p in zip(spreads, prices) if s and p]
         return mean(vals) if vals else 1e-9
@@ -52,58 +63,54 @@ def spread_ratio(info, shock_it=200):
 
 
 def recovery_time(info, shock_it=200):
-    """
-    Количество итераций после шока пока цена остаётся ниже
-    среднего уровня цены до шока. Чем дольше — тем тяжелее кризис.
-    """
     pre_mean = mean(info.prices[:shock_it])
-    post_prices = info.prices[shock_it:]
     count = 0
-    for p in post_prices:
+    for p in info.prices[shock_it:]:
         if p < pre_mean:
             count += 1
         else:
-            break  # как только цена вернулась — останавливаемся
+            break
     return count
 
 
 def max_drawdown(info, shock_it=200):
-    """Максимальное падение цены после шока относительно цены до шока."""
     pre_price = info.prices[shock_it - 1]
     post = info.prices[shock_it:]
     if not post:
         return 0.0
-    min_post = min(post)
-    return (pre_price - min_post) / pre_price
+    return (pre_price - min(post)) / pre_price
 
 
 # ── Один прогон ───────────────────────────────────────────────────────────────
 
 def run_one(fast_share, n_iter=500, shock_it=200, shock_dp=-10,
-            fast_extra_call=True, fast_access=5, slow_access=1, seed=None):
+            access=1, seed=None):
+    """
+    access=1 для ВСЕХ агентов — изолируем чистый эффект скорости.
+    """
     if seed is not None:
         random.seed(seed)
         np.random.seed(seed)
 
     exchange = ExchangeAgent(price=100, std=25, volume=1000, rf=5e-4)
     all_traders = (
-        [Fundamentalist(exchange, 10**3, access=slow_access) for _ in range(10)] +
+        [Fundamentalist(exchange, 10**3, access=access) for _ in range(10)] +
         [Chartist(exchange, 10**3) for _ in range(10)] +
         [MarketMaker(exchange, 10**3, softlimit=100)]
     )
+
     non_mm = [t for t in all_traders if type(t) != MarketMaker]
     n_fast = int(round(fast_share * len(non_mm)))
     for i, t in enumerate(non_mm):
         t.speed = 'fast' if i < n_fast else 'slow'
-        if i < n_fast and type(t) == Fundamentalist:
-            t.access = fast_access
+        # access одинаковый у всех — только скорость разная
     for t in all_traders:
         if type(t) == MarketMaker:
             t.speed = 'slow'
 
     sim = Simulator(exchange=exchange, traders=all_traders,
                     events=[MarketPriceShock(shock_it, shock_dp)])
-    sim.simulate(n_iter, silent=True, fast_extra_call=fast_extra_call)
+    sim.simulate(n_iter, silent=True, fast_extra_call=True)
     info = sim.info
 
     return {
@@ -119,13 +126,13 @@ def run_one(fast_share, n_iter=500, shock_it=200, shock_dp=-10,
 
 # ── Полный грид ───────────────────────────────────────────────────────────────
 
-def run_grid(fast_shares=None, n_runs=10, n_iter=500, shock_it=200, shock_dp=-10):
+def run_grid(fast_shares=None, n_runs=30, n_iter=500, shock_it=200, shock_dp=-10):
     if fast_shares is None:
         fast_shares = [round(x * 0.1, 1) for x in range(11)]
     records = []
-    for fs in tqdm(fast_shares, desc=f'fast_share grid (dp={shock_dp})'):
+    for fs in tqdm(fast_shares, desc=f'fast_share grid (dp={shock_dp}, access=1)'):
         for run in range(n_runs):
-            res = run_one(fs, n_iter, shock_it, shock_dp,
+            res = run_one(fs, n_iter, shock_it, shock_dp, access=1,
                           seed=run * 100 + int(fs * 10))
             records.append({
                 'fast_share':     fs,
@@ -154,11 +161,7 @@ def aggregate(df):
     ).reset_index()
 
 
-def find_tipping_point(agg, col, baseline_multiplier=1.5):
-    """
-    Tipping point = первый fast_share где метрика превышает
-    baseline (fast_share=0) более чем в baseline_multiplier раз.
-    """
+def find_tipping_point(agg, col, baseline_multiplier=1.3):
     baseline = agg.loc[agg['fast_share'] == 0.0, col].values
     if len(baseline) == 0:
         return None
@@ -173,68 +176,58 @@ def find_tipping_point(agg, col, baseline_multiplier=1.5):
 
 # ── Графики ───────────────────────────────────────────────────────────────────
 
-def plot_results(agg, df, shock_dp, save='h1_v3_results.png'):
+def plot_results(agg, shock_dp, save=None):
+    if save is None:
+        save = FIGURE_DIR / "h1_v5_results.png"
     fig = plt.figure(figsize=(16, 12))
     gs = gridspec.GridSpec(2, 3, hspace=0.45, wspace=0.35)
     x = agg['fast_share']
 
     metrics = [
-        ('vol_ratio_mean',    'vol_ratio_std',    'crimson',   'Volatility after/before shock',   1.0),
-        ('spread_ratio_mean', 'spread_ratio_std', 'darkgreen', 'Spread after/before shock',            1.0),
-        ('recovery_mean',     'recovery_std',     'navy',      'Recovery time (iterations)', None),
-        ('drawdown_mean',     'drawdown_std',      'darkorange','Max. price drawdown (%)',        None),
-        ('mm_panic_mean',     'mm_panic_std',      'purple',   'MarketMaker panic',              None),
+        ('vol_ratio_mean',    'vol_ratio_std',    'crimson',    'Volatility after/before shock',    1.0),
+        ('spread_ratio_mean', 'spread_ratio_std', 'darkgreen',  'Spread after/before shock',             1.0),
+        ('recovery_mean',     'recovery_std',     'navy',       'Recovery time (iterations)', None),
+        ('drawdown_mean',     'drawdown_std',      'darkorange', 'Max. price drawdown',            None),
+        ('mm_panic_mean',     'mm_panic_std',      'purple',    'MarketMaker panic',              None),
     ]
-
     positions = [gs[0,0], gs[0,1], gs[0,2], gs[1,0], gs[1,1]]
 
     for pos, (col_m, col_s, color, title, baseline) in zip(positions, metrics):
         ax = fig.add_subplot(pos)
         ax.plot(x, agg[col_m], 'o-', color=color, lw=2)
-        ax.fill_between(x, agg[col_m]-agg[col_s],
-                           agg[col_m]+agg[col_s], alpha=0.2, color=color)
+        ax.fill_between(x, agg[col_m] - agg[col_s],
+                           agg[col_m] + agg[col_s], alpha=0.2, color=color)
+        handles = []
         if baseline is not None:
-            ax.axhline(baseline, color='black', ls='--', lw=1, label=f'Baseline ({baseline})')
-
+            h = ax.axhline(baseline, color='black', ls='--', lw=1,
+                           label=f'Baseline ({baseline})')
+            handles.append(h)
         tp = find_tipping_point(agg, col_m)
         if tp is not None:
-            ax.axvline(tp, color='orange', ls=':', lw=2, label=f'Tipping point ({tp})')
-
+            h = ax.axvline(tp, color='orange', ls=':', lw=2,
+                           label=f'Tipping point ({tp})')
+            handles.append(h)
         ax.set(title=title, xlabel='Fast agent share')
-        ax.legend(fontsize=7); ax.grid(alpha=0.3)
+        if handles:
+            ax.legend(fontsize=7)
+        ax.grid(alpha=0.3)
 
-    # Сводный график — все нормированные метрики на одном
+    # Сводный нормированный график
     ax = fig.add_subplot(gs[1, 2])
     for col_m, _, color, label, _ in metrics:
-        norm = agg[col_m] / agg[col_m].iloc[0]  # нормируем на значение при fast_share=0
-        ax.plot(x, norm, 'o-', color=color, lw=1.5,
-                label=label.split('(')[0].strip()[:20])
+        norm = agg[col_m] / agg[col_m].iloc[0]
+        ax.plot(x, norm, 'o-', color=color, lw=1.5, label=label[:22])
     ax.axhline(1.0, color='black', ls='--', lw=1, label='Baseline')
     ax.set(title='All metrics (norm. to fast_share=0)',
            xlabel='Fast agent share', ylabel='Relative change')
-    ax.legend(fontsize=6); ax.grid(alpha=0.3)
+    ax.legend(fontsize=6)
+    ax.grid(alpha=0.3)
 
     plt.suptitle(
-        f'Hypothesis 1 v3: Direct instability metrics\n'
-        f'shock dp={shock_dp} | fast_access=5, slow_access=1 | 10 runs',
+        f'Hypothesis 1 v5: pure speed effect (access=1 for all)\n'
+        f'10 Fund + 10 Chart + 1 MM | shock dp={shock_dp} | 30 runs',
         fontsize=12, fontweight='bold'
     )
-    plt.savefig(save, dpi=150, bbox_inches='tight')
-    print(f'Сохранено: {save}')
-
-
-def plot_price_examples(shock_dp=-10, save='h1_v3_price_examples.png'):
-    fig, axes = plt.subplots(2, 2, figsize=(14, 8))
-    for ax, fs in zip(axes.flatten(), [0.0, 0.3, 0.6, 1.0]):
-        res = run_one(fs, shock_dp=shock_dp, seed=42)
-        ax.plot(res['prices'], color='black', lw=0.8)
-        ax.axvline(200, color='red', ls='--', lw=1.5, label='Shock')
-        ax.axhline(mean(res['prices'][:200]), color='blue', ls=':', lw=1, label='Pre-shock mean')
-        ax.set(title=f'fast_share={fs} | drawdown={res["max_drawdown"]:.2f} | recovery={res["recovery_time"]}',
-               xlabel='Iteration', ylabel='Price')
-        ax.legend(fontsize=7); ax.grid(alpha=0.3)
-    plt.suptitle(f'Sample price paths | shock dp={shock_dp}', fontsize=13, fontweight='bold')
-    plt.tight_layout()
     plt.savefig(save, dpi=150, bbox_inches='tight')
     print(f'Сохранено: {save}')
 
@@ -243,33 +236,34 @@ def plot_price_examples(shock_dp=-10, save='h1_v3_price_examples.png'):
 
 if __name__ == '__main__':
     print('=' * 60)
-    print('ГИПОТЕЗА 1 v3: прямые метрики нестабильности')
-    print('Метрики: vol_ratio, spread_ratio, recovery_time,')
-    print('         max_drawdown, mm_panic_ratio')
+    print('ГИПОТЕЗА 1 v5: чистый эффект скорости')
+    print('access=1 у всех агентов, только приоритет в очереди')
+    print('10 Fundamentalist + 10 Chartist + 1 MarketMaker')
     print('=' * 60)
 
-    SHOCK_DP = -10   # можно менять
+    SHOCK_DP = -10
 
-    print(f'\n[1/3] Примеры ценовых путей (dp={SHOCK_DP})...')
-    plot_price_examples(shock_dp=SHOCK_DP)
-
-    print(f'\n[2/3] Полный грид (11 × 10 = 110 симуляций, dp={SHOCK_DP})...')
-    df = run_grid(n_runs=10, n_iter=500, shock_it=200, shock_dp=SHOCK_DP)
-    df.to_csv('h1_v3_raw.csv', index=False)
+    print(f'\n[1/2] Полный грид (11 × 30 = 330 симуляций, dp={SHOCK_DP})...')
+    print('      Ожидаемое время: ~30-40 минут')
+    df = run_grid(n_runs=30, n_iter=500, shock_it=200, shock_dp=SHOCK_DP)
+    df.to_csv(RAW_DIR / "h1_v5_raw.csv", index=False)
 
     agg = aggregate(df)
     print('\nАгрегированные результаты:')
-    print(agg[['fast_share','vol_ratio_mean','spread_ratio_mean',
-               'recovery_mean','drawdown_mean','mm_panic_mean']].to_string(index=False))
+    print(agg[['fast_share', 'vol_ratio_mean', 'spread_ratio_mean',
+               'recovery_mean', 'drawdown_mean', 'mm_panic_mean']].to_string(index=False))
 
-    # Tipping points по каждой метрике
-    print('\nTipping points (превышение базового уровня в 1.5x):')
-    for col, label in [('vol_ratio_mean','Волатильность'), ('spread_ratio_mean','Спред'),
-                       ('recovery_mean','Время восстановления'), ('drawdown_mean','Просадка'),
-                       ('mm_panic_mean','Паника MM')]:
+    print('\nTipping points (превышение базового уровня в 1.3x):')
+    for col, label in [
+        ('vol_ratio_mean',    'Волатильность'),
+        ('spread_ratio_mean', 'Спред'),
+        ('recovery_mean',     'Время восстановления'),
+        ('drawdown_mean',     'Просадка'),
+        ('mm_panic_mean',     'Паника MM'),
+    ]:
         tp = find_tipping_point(agg, col)
-        print(f'  {label}: {tp if tp else "не обнаружен"}')
+        print(f'  {label:25s}: {tp if tp is not None else "не обнаружен"}')
 
-    print('\n[3/3] Графики...')
-    plot_results(agg, df, shock_dp=SHOCK_DP)
+    print('\n[2/2] Графики...')
+    plot_results(agg, shock_dp=SHOCK_DP)
     print('\nГотово!')

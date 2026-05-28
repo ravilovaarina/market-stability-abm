@@ -12,6 +12,22 @@ n_runs = 20, остальное как в v5 (access=1 у всех)
 """
 
 import random
+import os
+import sys
+from pathlib import Path
+
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/1d-abm-mplconfig")
+os.makedirs(os.environ["MPLCONFIGDIR"], exist_ok=True)
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+RAW_DIR = PROJECT_ROOT / "results" / "h1" / "raw"
+FIGURE_DIR = PROJECT_ROOT / "results" / "h1" / "figures"
+RAW_DIR.mkdir(parents=True, exist_ok=True)
+FIGURE_DIR.mkdir(parents=True, exist_ok=True)
+sys.path.insert(0, str(PROJECT_ROOT))
+
+import matplotlib
+matplotlib.use("Agg")
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -137,7 +153,9 @@ def aggregate(df):
 
 # ── Графики ───────────────────────────────────────────────────────────────────
 
-def plot_results(agg, shock_dp, save='h1_v6_results.png'):
+def plot_results(agg, shock_dp, save=None):
+    if save is None:
+        save = FIGURE_DIR / "h1_v6_results.png"
     softlimits = sorted(agg['softlimit'].unique())
     colors = ['#d62728', '#ff7f0e', '#2ca02c', '#1f77b4', '#9467bd']
 
@@ -171,6 +189,8 @@ def plot_results(agg, shock_dp, save='h1_v6_results.png'):
 
 
 def plot_heatmap(agg, col, title, save='h1_v6_heatmap.png'):
+    if not Path(str(save)).is_absolute():
+        save = FIGURE_DIR / str(save)
     """Heatmap: ось X = fast_share, ось Y = softlimit, цвет = метрика."""
     pivot = agg.pivot(index='softlimit', columns='fast_share', values=col)
 
@@ -205,7 +225,7 @@ if __name__ == '__main__':
         softlimits=[5, 10, 20, 50, 100],
         n_runs=20, n_iter=500, shock_it=200, shock_dp=SHOCK_DP
     )
-    df.to_csv('h1_v6_raw.csv', index=False)
+    df.to_csv(RAW_DIR / "h1_v6_raw.csv", index=False)
 
     agg = aggregate(df)
 

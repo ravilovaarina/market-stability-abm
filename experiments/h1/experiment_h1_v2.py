@@ -2,6 +2,24 @@
 Experiment H1 v2: перебираем разные величины шока + разница в access
 """
 import random
+import os
+import sys
+from pathlib import Path
+
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/1d-abm-mplconfig")
+os.makedirs(os.environ["MPLCONFIGDIR"], exist_ok=True)
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+RAW_DIR = PROJECT_ROOT / "results" / "h1" / "raw"
+TABLE_DIR = PROJECT_ROOT / "results" / "h1" / "tables"
+FIGURE_DIR = PROJECT_ROOT / "results" / "h1" / "figures"
+RAW_DIR.mkdir(parents=True, exist_ok=True)
+TABLE_DIR.mkdir(parents=True, exist_ok=True)
+FIGURE_DIR.mkdir(parents=True, exist_ok=True)
+sys.path.insert(0, str(PROJECT_ROOT))
+
+import matplotlib
+matplotlib.use("Agg")
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -119,7 +137,9 @@ def find_tipping_point(agg, col='crisis_mean', threshold=0.3):
     return None
 
 
-def plot_shock_sweep(df_sweep, save='h1_shock_sweep.png'):
+def plot_shock_sweep(df_sweep, save=None):
+    if save is None:
+        save = FIGURE_DIR / "h1_shock_sweep.png"
     """Heatmap: ось X = fast_share, ось Y = shock_dp, цвет = crisis_share."""
     pivot = df_sweep.groupby(['shock_dp', 'fast_share'])['crisis_share'].mean().unstack()
     fig, axes = plt.subplots(1, 2, figsize=(16, 5))
@@ -151,7 +171,9 @@ def plot_shock_sweep(df_sweep, save='h1_shock_sweep.png'):
     plt.savefig(save, dpi=150, bbox_inches='tight')
     print(f'Сохранено: {save}')
 
-def plot_main(agg, df, shock_dp, save='h1_results_v2.png'):
+def plot_main(agg, df, shock_dp, save=None):
+    if save is None:
+        save = FIGURE_DIR / "h1_results_v2.png"
     fig = plt.figure(figsize=(16, 10))
     gs = gridspec.GridSpec(2, 2, hspace=0.4, wspace=0.35)
     tp = find_tipping_point(agg)
@@ -217,7 +239,7 @@ if __name__ == '__main__':
         fast_shares=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
         n_runs=5, n_iter=500, shock_it=200
     )
-    df_sweep.to_csv('h1_sweep.csv', index=False)
+    df_sweep.to_csv(TABLE_DIR / "h1_sweep.csv", index=False)
     plot_shock_sweep(df_sweep)
 
     # Выбираем лучший dp — тот где максимальный разброс crisis_share по fast_share
@@ -229,7 +251,7 @@ if __name__ == '__main__':
     # Шаг 2: полный грид с лучшим dp
     print(f'\n[2/2] Полный грид с dp={best_dp} (11 × 10 = 110 симуляций)...')
     df = run_grid(n_runs=10, n_iter=500, shock_it=200, shock_dp=best_dp)
-    df.to_csv(f'h1_raw_dp{best_dp}.csv', index=False)
+    df.to_csv(RAW_DIR / f'h1_raw_dp{best_dp}.csv', index=False)
     agg = aggregate(df)
     print(agg.to_string(index=False))
 

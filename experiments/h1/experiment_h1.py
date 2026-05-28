@@ -2,6 +2,22 @@
 Experiment H1: Tipping Point in Latency Heterogeneity
 """
 import random
+import os
+import sys
+from pathlib import Path
+
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/1d-abm-mplconfig")
+os.makedirs(os.environ["MPLCONFIGDIR"], exist_ok=True)
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+RAW_DIR = PROJECT_ROOT / "results" / "h1" / "raw"
+FIGURE_DIR = PROJECT_ROOT / "results" / "h1" / "figures"
+RAW_DIR.mkdir(parents=True, exist_ok=True)
+FIGURE_DIR.mkdir(parents=True, exist_ok=True)
+sys.path.insert(0, str(PROJECT_ROOT))
+
+import matplotlib
+matplotlib.use("Agg")
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -95,7 +111,9 @@ def find_tipping_point(agg, col='crisis_mean', threshold=0.3):
     return None
 
 
-def plot_main(agg, df, save='h1_results.png'):
+def plot_main(agg, df, save=None):
+    if save is None:
+        save = FIGURE_DIR / "h1_results.png"
     fig = plt.figure(figsize=(16, 10))
     gs = gridspec.GridSpec(2, 2, hspace=0.4, wspace=0.35)
     tp = find_tipping_point(agg)
@@ -151,7 +169,9 @@ def plot_main(agg, df, save='h1_results.png'):
     plt.show()
 
 
-def plot_price_examples(save='h1_prices.png'):
+def plot_price_examples(save=None):
+    if save is None:
+        save = FIGURE_DIR / "h1_prices.png"
     fig, axes = plt.subplots(2, 2, figsize=(14, 8))
     for ax, fs in zip(axes.flatten(), [0.0, 0.3, 0.6, 1.0]):
         res = run_one(fs, seed=42)
@@ -177,7 +197,7 @@ if __name__ == '__main__':
 
     print('\n[2/3] Запуск грида (11 × 10 = 110 симуляций)...')
     df = run_grid(n_runs=10, n_iter=500, shock_it=200)
-    df.to_csv('h1_raw.csv', index=False)
+    df.to_csv(RAW_DIR / "h1_raw.csv", index=False)
     agg = aggregate(df)
     print(agg.to_string(index=False))
 
