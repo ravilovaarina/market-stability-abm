@@ -24,10 +24,35 @@ Outputs:
 from __future__ import annotations
 
 import argparse
+import os
 import random
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence
 
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/1d-abm-mplconfig")
+os.makedirs(os.environ["MPLCONFIGDIR"], exist_ok=True)
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+RESULT_ROOT = PROJECT_ROOT / "results" / "h2" / "event_time"
+RAW_DIR = RESULT_ROOT / "raw"
+TABLE_DIR = RESULT_ROOT / "tables"
+FIGURE_DIR = RESULT_ROOT / "figures"
+CALIBRATED_ROOT = PROJECT_ROOT / "results" / "h2" / "calibrated"
+CALIBRATED_RAW_DIR = CALIBRATED_ROOT / "raw"
+CALIBRATED_TABLE_DIR = CALIBRATED_ROOT / "tables"
+CALIBRATED_FIGURE_DIR = CALIBRATED_ROOT / "figures"
+RAW_DIR.mkdir(parents=True, exist_ok=True)
+TABLE_DIR.mkdir(parents=True, exist_ok=True)
+FIGURE_DIR.mkdir(parents=True, exist_ok=True)
+CALIBRATED_RAW_DIR.mkdir(parents=True, exist_ok=True)
+CALIBRATED_TABLE_DIR.mkdir(parents=True, exist_ok=True)
+CALIBRATED_FIGURE_DIR.mkdir(parents=True, exist_ok=True)
+sys.path.insert(0, str(PROJECT_ROOT))
+
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -63,13 +88,21 @@ DEFAULT_VOL_WINDOW = 10
 DEFAULT_SOFTLIMIT = 100
 DEFAULT_N_RANDOM = 5
 
-RAW_OUT = "h2_event_time_raw.csv"
-AGG_OUT = "h2_event_time_agg.csv"
-TIPPING_OUT = "h2_event_time_tipping.csv"
-STATS_OUT = "h2_event_time_stats.csv"
-METRICS_PNG = "h2_event_time_metrics.png"
-HEATMAP_PNG = "h2_event_time_heatmap.png"
-TIPPING_PNG = "h2_event_time_tipping.png"
+RAW_OUT = str(RAW_DIR / "h2_event_time_raw.csv")
+AGG_OUT = str(TABLE_DIR / "h2_event_time_agg.csv")
+TIPPING_OUT = str(TABLE_DIR / "h2_event_time_tipping.csv")
+STATS_OUT = str(TABLE_DIR / "h2_event_time_stats.csv")
+METRICS_PNG = str(FIGURE_DIR / "h2_event_time_metrics.png")
+HEATMAP_PNG = str(FIGURE_DIR / "h2_event_time_heatmap.png")
+TIPPING_PNG = str(FIGURE_DIR / "h2_event_time_tipping.png")
+
+CALIBRATED_RAW_OUT = str(CALIBRATED_RAW_DIR / "h2_calibrated_raw.csv")
+CALIBRATED_AGG_OUT = str(CALIBRATED_TABLE_DIR / "h2_calibrated_agg.csv")
+CALIBRATED_TIPPING_OUT = str(CALIBRATED_TABLE_DIR / "h2_calibrated_tipping.csv")
+CALIBRATED_STATS_OUT = str(CALIBRATED_TABLE_DIR / "h2_calibrated_stats.csv")
+CALIBRATED_METRICS_PNG = str(CALIBRATED_FIGURE_DIR / "h2_calibrated_metrics.png")
+CALIBRATED_HEATMAP_PNG = str(CALIBRATED_FIGURE_DIR / "h2_calibrated_heatmap.png")
+CALIBRATED_TIPPING_PNG = str(CALIBRATED_FIGURE_DIR / "h2_calibrated_tipping.png")
 
 
 def patch_order_list_insert():
@@ -1022,5 +1055,31 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def apply_output_profile(args: argparse.Namespace) -> argparse.Namespace:
+    if not args.calibrate_vstar:
+        return args
+
+    defaults = {
+        "raw_out": RAW_OUT,
+        "agg_out": AGG_OUT,
+        "tipping_out": TIPPING_OUT,
+        "stats_out": STATS_OUT,
+        "metrics_png": METRICS_PNG,
+        "heatmap_png": HEATMAP_PNG,
+        "tipping_png": TIPPING_PNG,
+    }
+    if any(getattr(args, key) != value for key, value in defaults.items()):
+        return args
+
+    args.raw_out = CALIBRATED_RAW_OUT
+    args.agg_out = CALIBRATED_AGG_OUT
+    args.tipping_out = CALIBRATED_TIPPING_OUT
+    args.stats_out = CALIBRATED_STATS_OUT
+    args.metrics_png = CALIBRATED_METRICS_PNG
+    args.heatmap_png = CALIBRATED_HEATMAP_PNG
+    args.tipping_png = CALIBRATED_TIPPING_PNG
+    return args
+
+
 if __name__ == "__main__":
-    run_experiment(parse_args())
+    run_experiment(apply_output_profile(parse_args()))

@@ -23,7 +23,23 @@ import argparse
 import os
 import random
 import sys
+from pathlib import Path
 from typing import Dict, List, Optional, Sequence
+
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/1d-abm-mplconfig")
+os.makedirs(os.environ["MPLCONFIGDIR"], exist_ok=True)
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+H2_DIR = Path(__file__).resolve().parent
+RESULT_ROOT = PROJECT_ROOT / "results" / "h2" / "volume_matched"
+RAW_DIR = RESULT_ROOT / "raw"
+TABLE_DIR = RESULT_ROOT / "tables"
+FIGURE_DIR = RESULT_ROOT / "figures"
+RAW_DIR.mkdir(parents=True, exist_ok=True)
+TABLE_DIR.mkdir(parents=True, exist_ok=True)
+FIGURE_DIR.mkdir(parents=True, exist_ok=True)
+sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(H2_DIR))
 
 import matplotlib
 
@@ -33,8 +49,6 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from tqdm import tqdm
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from AgentBasedModel.agents import Chartist, Random
 from AgentBasedModel.events import MarketPriceShock
@@ -448,13 +462,25 @@ def summarize_differences(diffs: pd.DataFrame) -> pd.DataFrame:
 
 
 def output_paths(prefix: str) -> Dict[str, str]:
+    prefix_path = Path(prefix)
+    if prefix_path.parent != Path("."):
+        base = prefix_path
+        return {
+            "raw": str(base.with_name(f"{base.name}_raw.csv")),
+            "agg": str(base.with_name(f"{base.name}_agg.csv")),
+            "diffs": str(base.with_name(f"{base.name}_paired_diffs.csv")),
+            "diff_summary": str(base.with_name(f"{base.name}_diff_summary.csv")),
+            "metrics_png": str(base.with_name(f"{base.name}_metrics.png")),
+            "diff_png": str(base.with_name(f"{base.name}_diffs.png")),
+        }
+
     return {
-        "raw": f"{prefix}_raw.csv",
-        "agg": f"{prefix}_agg.csv",
-        "diffs": f"{prefix}_paired_diffs.csv",
-        "diff_summary": f"{prefix}_diff_summary.csv",
-        "metrics_png": f"{prefix}_metrics.png",
-        "diff_png": f"{prefix}_diffs.png",
+        "raw": str(RAW_DIR / f"{prefix}_raw.csv"),
+        "agg": str(TABLE_DIR / f"{prefix}_agg.csv"),
+        "diffs": str(TABLE_DIR / f"{prefix}_paired_diffs.csv"),
+        "diff_summary": str(TABLE_DIR / f"{prefix}_diff_summary.csv"),
+        "metrics_png": str(FIGURE_DIR / f"{prefix}_metrics.png"),
+        "diff_png": str(FIGURE_DIR / f"{prefix}_diffs.png"),
     }
 
 

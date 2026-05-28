@@ -172,7 +172,7 @@ phi* = first phi where mean vol_ratio(phi) >= threshold
 The experiment is implemented in:
 
 ```text
-experiment_h2_event_time.py
+experiments/h2/experiment_h2_event_time.py
 ```
 
 It is standalone and does not modify the core package files.
@@ -187,6 +187,44 @@ The file defines:
 6. statistical tests
 7. plots
 8. CSV outputs
+
+---
+
+## Repository Structure
+
+```text
+1D-ABM/
+├── AgentBasedModel/                 # Baseline simulator package
+├── docs/
+│   └── documentation.md             # H2 branch documentation
+├── experiments/
+│   ├── baseline/
+│   │   └── main.py                  # Original baseline runner
+│   └── h2/
+│       ├── experiment_h2_event_time.py
+│       └── experiment_h2_volume_matched.py
+├── results/
+│   └── h2/
+│       ├── event_time/
+│       │   ├── raw/
+│       │   ├── tables/
+│       │   └── figures/
+│       ├── calibrated/
+│       │   ├── raw/
+│       │   ├── tables/
+│       │   └── figures/
+│       ├── high_activity/
+│       │   ├── raw/
+│       │   ├── tables/
+│       │   └── figures/
+│       └── volume_matched/
+│           ├── raw/
+│           ├── tables/
+│           └── figures/
+└── requirements.txt
+```
+
+The project root is kept free of experiment scripts and generated H2 outputs.
 
 ---
 
@@ -228,7 +266,7 @@ This keeps the volume-clock mechanism local to the experiment file.
 
 After comparing this branch with the H1 `hft-intraiter` branch, several H1 changes were classified as
 general infrastructure fixes rather than H1-only logic. H2 reuses them locally inside
-`experiment_h2_event_time.py`:
+`experiments/h2/experiment_h2_event_time.py`:
 
 1. **Safe empty-book price handling.**
    If one side of the book is empty, `VolumeExchangeAgent.price()` returns the last valid midpoint and
@@ -341,20 +379,20 @@ The corrected H2 code now uses 5 Random agents by default:
 For direct comparison with the strongest H1 unified speed result, run H2 with:
 
 ```bash
-python3 experiment_h2_event_time.py --speed-multiplier 2
+python3 experiments/h2/experiment_h2_event_time.py --speed-multiplier 2
 ```
 
 For comparison with the pure fast-first v9-style setting, run:
 
 ```bash
-python3 experiment_h2_event_time.py --speed-multiplier 1
+python3 experiments/h2/experiment_h2_event_time.py --speed-multiplier 1
 ```
 
 The H2 result should be reported only after the corrected population is rerun.
 
 ### Status of Existing Result Files After Population Correction
 
-Any `h2_event_time_*.csv` / `h2_event_time_*.png` files produced before this correction should be
+Any `results/h2/event_time/.../h2_event_time_*` files produced before this correction should be
 treated as **preliminary**. They are not invalid as debugging evidence, but they do not answer the
 final H2 question because the calendar-time baseline used a different population from the H1 speed grid.
 
@@ -496,13 +534,13 @@ much more legitimate.
 For the final H2 comparison against the strongest unified H1 speed regime:
 
 ```bash
-python3 experiment_h2_event_time.py --speed-multiplier 2 --calibrate-vstar
+python3 experiments/h2/experiment_h2_event_time.py --speed-multiplier 2 --calibrate-vstar
 ```
 
 For a v9-style pure fast-first comparison:
 
 ```bash
-python3 experiment_h2_event_time.py --speed-multiplier 1 --calibrate-vstar
+python3 experiments/h2/experiment_h2_event_time.py --speed-multiplier 1 --calibrate-vstar
 ```
 
 The old `{25, 50, 100}` run should be treated as a high-activity sensitivity run, not as the final
@@ -525,7 +563,7 @@ mixed two mechanisms: timekeeping and total market activity.
 The final H2 candidate run must use:
 
 ```bash
-python3 experiment_h2_event_time.py --speed-multiplier 2 --calibrate-vstar
+python3 experiments/h2/experiment_h2_event_time.py --speed-multiplier 2 --calibrate-vstar
 ```
 
 This writes calibrated `Vstar` values into the raw and aggregate CSV files through:
@@ -629,28 +667,40 @@ This is the same logic as the H1 statistical validation.
 The experiment writes:
 
 ```text
-h2_event_time_raw.csv
-h2_event_time_agg.csv
-h2_event_time_tipping.csv
-h2_event_time_stats.csv
-h2_event_time_metrics.png
-h2_event_time_heatmap.png
-h2_event_time_tipping.png
+results/h2/event_time/raw/h2_event_time_raw.csv
+results/h2/event_time/tables/h2_event_time_agg.csv
+results/h2/event_time/tables/h2_event_time_tipping.csv
+results/h2/event_time/tables/h2_event_time_stats.csv
+results/h2/event_time/figures/h2_event_time_metrics.png
+results/h2/event_time/figures/h2_event_time_heatmap.png
+results/h2/event_time/figures/h2_event_time_tipping.png
 ```
 
-### `h2_event_time_raw.csv`
+When the same script is run with `--calibrate-vstar` and default output arguments, it writes the calibrated run to:
+
+```text
+results/h2/calibrated/raw/h2_calibrated_raw.csv
+results/h2/calibrated/tables/h2_calibrated_agg.csv
+results/h2/calibrated/tables/h2_calibrated_tipping.csv
+results/h2/calibrated/tables/h2_calibrated_stats.csv
+results/h2/calibrated/figures/h2_calibrated_metrics.png
+results/h2/calibrated/figures/h2_calibrated_heatmap.png
+results/h2/calibrated/figures/h2_calibrated_tipping.png
+```
+
+### `results/h2/event_time/raw/h2_event_time_raw.csv`
 
 One row per simulation run.
 
-### `h2_event_time_agg.csv`
+### `results/h2/event_time/tables/h2_event_time_agg.csv`
 
 Aggregated means, standard deviations, and confidence intervals by regime and `phi`.
 
-### `h2_event_time_tipping.csv`
+### `results/h2/event_time/tables/h2_event_time_tipping.csv`
 
 Tipping point summary for each regime.
 
-### `h2_event_time_stats.csv`
+### `results/h2/event_time/tables/h2_event_time_stats.csv`
 
 Mann-Whitney U results.
 
@@ -711,25 +761,25 @@ In that case, the paper should report H2 as regime-dependent rather than univers
 Do not run automatically while writing code. When ready, run manually:
 
 ```bash
-python3 experiment_h2_event_time.py --speed-multiplier 2 --calibrate-vstar
+python3 experiments/h2/experiment_h2_event_time.py --speed-multiplier 2 --calibrate-vstar
 ```
 
 For a smaller smoke test:
 
 ```bash
-python3 experiment_h2_event_time.py --runs 2 --n-ticks 120 --shock-tick 50 --speed-multiplier 2 --calibrate-vstar --no-plots
+python3 experiments/h2/experiment_h2_event_time.py --runs 2 --n-ticks 120 --shock-tick 50 --speed-multiplier 2 --calibrate-vstar --no-plots
 ```
 
 For a v9-style fast-first comparison without additional speed multiplication:
 
 ```bash
-python3 experiment_h2_event_time.py --speed-multiplier 1 --calibrate-vstar
+python3 experiments/h2/experiment_h2_event_time.py --speed-multiplier 1 --calibrate-vstar
 ```
 
 For a high-activity sensitivity run only:
 
 ```bash
-python3 experiment_h2_event_time.py --speed-multiplier 2 --vstar 25 50 100
+python3 experiments/h2/experiment_h2_event_time.py --speed-multiplier 2 --vstar 25 50 100
 ```
 
 ---
@@ -769,7 +819,7 @@ Compared with calendar time, event-time updating shifted / did not shift the cri
 
 Changes:
 
-- standalone `experiment_h2_event_time.py`;
+- standalone `experiments/h2/experiment_h2_event_time.py`;
 - calendar mode and event-time mode;
 - `VolumeExchangeAgent`;
 - first volume-clock diagnostics;
@@ -890,213 +940,11 @@ Status:
 Use this command for the main H2 result:
 
 ```bash
-python3 experiment_h2_event_time.py --speed-multiplier 2 --calibrate-vstar
+python3 experiments/h2/experiment_h2_event_time.py --speed-multiplier 2 --calibrate-vstar
 ```
 
-After running, interpret only the newly generated `h2_event_time_*.csv` / `.png` files.
+After running, interpret only the newly generated files under `results/h2/event_time/`.
 Older files from Version 0-2 should be labeled as preliminary or sensitivity runs.
-
----
-
-## Plan: Port H2 into the H1 Unified Environment
-
-The next step is to move the validated H2 idea into the H1 branch instead of continuing with a standalone
-baseline-branch implementation.
-
-### Why Porting Is Necessary
-
-The scientific problem is comparability:
-
-```text
-H1 unified speed×2 phi* != standalone H2 calendar speed×2 phi*
-```
-
-Since H2 asks whether changing the clock shifts the H1 tipping point, the calendar-time part of H2 should
-reuse the same H1 implementation that produced the original speed-grid result.
-
-The clean target is:
-
-```text
-same H1 unified population
-same H1 unified TrendChartist / SlowTrendChartist classes
-same H1 unified SimulatorInfo / metrics
-same H1 unified speed_multiplier logic
-same H1 unified calendar simulation
-only change: calendar-time loop vs event-time loop
-```
-
-### Target Branch
-
-Use the H1 branch:
-
-```bash
-git switch hft-intraiter
-```
-
-Then create a new branch from it:
-
-```bash
-git switch -c h2-on-h1-volume-clock
-```
-
-This new branch should inherit all H1 unified infrastructure and add only the H2 event-time experiment.
-
-### Files to Bring Over
-
-From this standalone H2 branch, the useful pieces are:
-
-1. Volume counters from `VolumeExchangeAgent`.
-2. Event-time simulation loop.
-3. `Vstar` calibration logic.
-4. Event-time diagnostics:
-
-```text
-avg_sub_iters
-threshold_hit_rate
-executed_volume_total
-book_depleted_rate
-calendar_volume_per_tick_target
-vstar_to_calendar_tick_ratio
-```
-
-5. Plot/output structure:
-
-```text
-raw CSV
-aggregate CSV
-tipping CSV
-Mann-Whitney CSV
-metrics plot
-heatmap
-tipping plot
-```
-
-### What Not to Bring Over
-
-Do not bring the standalone H2 population and agent definitions if the H1 branch already has equivalent
-unified versions.
-
-In particular, avoid duplicating:
-
-- H1 `TrendChartist` if it already exists in `experiment_unified.py`;
-- H1 population construction if `create_population()` already exists;
-- H1 calendar simulator if `SimulatorUnified` already exists.
-
-The ported H2 should reuse those H1 pieces.
-
-### Implementation Steps
-
-1. Switch to H1 branch:
-
-```bash
-git switch hft-intraiter
-```
-
-2. Create a new H2-on-H1 branch:
-
-```bash
-git switch -c h2-on-h1-volume-clock
-```
-
-3. Copy or recreate a new experiment file:
-
-```text
-experiment_h2_event_time_unified.py
-```
-
-4. Import / reuse from `experiment_unified.py` where possible:
-
-```text
-TrendChartist
-SlowTrendChartist
-SimulatorUnified
-create_population
-vol_ratio
-spread_ratio
-max_drawdown
-recovery_time
-```
-
-5. Add executed-volume tracking to the exchange used by the H2 experiment.
-
-   Preferred minimal approach:
-
-   - subclass the H1 `ExchangeAgent`;
-   - override `limit_order()` and `market_order()` to count matched quantity;
-   - keep H1 delayed-info and safe-book behavior.
-
-6. Add an event-time simulator class or function:
-
-```text
-SimulatorEventTimeUnified
-```
-
-It should reuse the same H1 behaviour update and fast/slow activation logic, but replace the calendar tick
-with:
-
-```text
-repeat trading rounds until executed_volume_tick >= Vstar
-```
-
-7. Keep the calendar baseline literally H1-style:
-
-```text
-calendar mode = SimulatorUnified.simulate(..., speed_multiplier=2)
-```
-
-8. Run a sanity check:
-
-```text
-calendar mode speed×2 should approximately reproduce H1 unified speed×2 tipping point
-```
-
-Expected target:
-
-```text
-phi* close to 0.2
-```
-
-If this fails, do not interpret H2 yet.
-
-9. Only after the sanity check passes, run event-time modes:
-
-```text
---calibrate-vstar
-```
-
-10. Save outputs under names that do not overwrite older standalone H2 files:
-
-```text
-h2_unified_calibrated_raw.csv
-h2_unified_calibrated_agg.csv
-h2_unified_calibrated_tipping.csv
-h2_unified_calibrated_stats.csv
-h2_unified_calibrated_metrics.png
-h2_unified_calibrated_heatmap.png
-h2_unified_calibrated_tipping.png
-```
-
-### Acceptance Criteria for Final H2
-
-The ported H2 experiment becomes legitimate if:
-
-1. H2 calendar baseline approximately reproduces H1 unified speed×2.
-2. Event-time modes differ only by the timekeeping mechanism.
-3. `Vstar` is calibrated from calendar executed volume.
-4. Diagnostics show:
-
-```text
-threshold_hit_rate reasonably high
-book_depleted_rate not dominating the result
-```
-
-5. The interpretation is based on:
-
-```text
-phi*_calendar vs phi*_event_time
-```
-
-inside the same H1-unified environment.
 
 ---
 
@@ -1119,7 +967,7 @@ It was originally created by mistake while working on the H3 branch. The H3 bran
 The corrected H2-clean experiment is now placed on the H2 branch as:
 
 ```text
-experiment_h2_volume_matched.py
+experiments/h2/experiment_h2_volume_matched.py
 ```
 
 ### Why This Additional H2 Experiment Was Needed
@@ -1149,7 +997,7 @@ The paired design is important because it reduces noise: each event-time result 
 
 ### Implementation Details
 
-The script is self-contained on the H2 branch and reuses local H2-safe components from `experiment_h2_event_time.py`:
+The script is self-contained on the H2 branch and reuses local H2-safe components from `experiments/h2/experiment_h2_event_time.py`:
 
 - `VolumeExchangeAgent`
 - `TrendChartist`
@@ -1198,20 +1046,20 @@ The row counts are:
 
 | File | Rows |
 |---|---:|
-| `h2_volume_matched_raw.csv` | 400 |
-| `h2_volume_matched_agg.csv` | 8 |
-| `h2_volume_matched_paired_diffs.csv` | 200 |
-| `h2_volume_matched_diff_summary.csv` | 4 |
+| `results/h2/volume_matched/raw/h2_volume_matched_raw.csv` | 400 |
+| `results/h2/volume_matched/tables/h2_volume_matched_agg.csv` | 8 |
+| `results/h2/volume_matched/tables/h2_volume_matched_paired_diffs.csv` | 200 |
+| `results/h2/volume_matched/tables/h2_volume_matched_diff_summary.csv` | 4 |
 
 ### Output Files
 
 ```text
-h2_volume_matched_raw.csv
-h2_volume_matched_agg.csv
-h2_volume_matched_paired_diffs.csv
-h2_volume_matched_diff_summary.csv
-h2_volume_matched_metrics.png
-h2_volume_matched_diffs.png
+results/h2/volume_matched/raw/h2_volume_matched_raw.csv
+results/h2/volume_matched/tables/h2_volume_matched_agg.csv
+results/h2/volume_matched/tables/h2_volume_matched_paired_diffs.csv
+results/h2/volume_matched/tables/h2_volume_matched_diff_summary.csv
+results/h2/volume_matched/figures/h2_volume_matched_metrics.png
+results/h2/volume_matched/figures/h2_volume_matched_diffs.png
 ```
 
 ### Volume-Matching Diagnostics
