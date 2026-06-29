@@ -17,7 +17,7 @@ This repository is part of my course research project on financial market stabil
 
 The full course paper is available here:
 
-[Financial Market Stability under Heterogeneous Information Speeds: An Agent-Based Modeling Approach](docs/Ravilova_Course_Project_Report.pdf)
+[Financial Market Stability under Heterogeneous Information Speeds: An Agent-Based Modeling Approach](docs/Coursework-Ravilova.pdf)
 
 ## Why This Project Exists
 
@@ -55,7 +55,7 @@ The market price is derived from the best bid and ask in the order book. Traders
 │   ├── utils/           # Order and order-book primitives
 │   └── visualization/   # Plotting utilities for market and trader metrics
 ├── docs/
-│   └── Ravilova_Course_Project_Report.pdf
+│   └── Coursework-Ravilova.pdf
 ├── main.py              # Exploratory runner
 ├── documentation.md     # Detailed baseline architecture notes
 └── requirements.txt
