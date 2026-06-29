@@ -110,6 +110,14 @@ The `main` branch is the baseline model. Hypothesis-specific work is developed i
 - `h3-volatility-clustering` - information delay, liquidity constraints, and post-shock stability
 - `results` - consolidated experiment outputs and deliverables
 
+## Known Limitations
+
+- The model is stylized and is designed for mechanism exploration, not for forecasting real market prices or directly calibrating trading policy.
+- Agent behavior is intentionally simplified: traders follow rule-based strategies rather than learned or institution-specific decision processes.
+- The order book abstracts away many real exchange details, including queue priority rules, latency infrastructure, hidden liquidity, and multi-asset interactions.
+- Results depend on parameter choices, random seed ensembles, shock design, and operational definitions such as the volatility tipping threshold.
+- The `main` branch contains the clean baseline simulator. Full H1, H2, and H3 experiment outputs are kept on the research and `results` branches.
+
 ## Portfolio Notes
 
 This project demonstrates:
