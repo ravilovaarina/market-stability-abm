@@ -63,7 +63,7 @@ The market price is derived from the best bid and ask in the order book. Traders
 
 ## Quick Start
 
-Create an environment and install the project dependencies:
+Create an environment and install the project dependencies. Python 3.10 is recommended because the dependency versions are pinned around the original research environment:
 
 ```bash
 python3 -m venv .venv
@@ -109,6 +109,15 @@ The `main` branch is the baseline model. Hypothesis-specific work is developed i
 - `h2-event-time-volume-clock` - calendar time versus event-time / volume-clock simulations
 - `h3-volatility-clustering` - information delay, liquidity constraints, and post-shock stability
 - `results` - consolidated experiment outputs and deliverables
+
+## Results and Outputs
+
+The consolidated experiment outputs are available on the [`results`](https://github.com/ravilovaarina/market-stability-abm/tree/results) branch. Useful entry points include:
+
+- [H1 speed grid raw output](https://github.com/ravilovaarina/market-stability-abm/blob/results/results/h1/raw/unified_speed_raw.csv)
+- [H2 paired statistical tests](https://github.com/ravilovaarina/market-stability-abm/blob/results/results/h2/raw/h2_paired_stat_tests.csv)
+- [H3 shock-absorption summary](https://github.com/ravilovaarina/market-stability-abm/blob/results/results/h3/summary/tables/h3_final_summary_shock_absorption.csv)
+- [H3 final summary figure](https://github.com/ravilovaarina/market-stability-abm/blob/results/results/h3/summary/figures/h3_final_summary.png)
 
 ## Known Limitations
 
